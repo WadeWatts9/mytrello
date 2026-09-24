@@ -20,12 +20,17 @@ export async function middleware(request: NextRequest) {
 
   // Check if setup is needed (no admin exists)
   // We check via internal API to avoid importing prisma in edge runtime
-  const setupCheck = await fetch(new URL("/api/setup", request.url));
-  const { needsSetup } = await setupCheck.json();
-
-  if (needsSetup) {
-    // First launch: redirect everything to /setup
-    return NextResponse.redirect(new URL("/setup", request.url));
+  try {
+    const setupCheck = await fetch(new URL("/api/setup", request.url));
+    if (setupCheck.ok) {
+      const data = await setupCheck.json();
+      if (data?.needsSetup) {
+        // First launch: redirect everything to /setup
+        return NextResponse.redirect(new URL("/setup", request.url));
+      }
+    }
+  } catch (err) {
+    console.error("Middleware setup check failed:", err);
   }
 
   // Require authentication for all other routes
