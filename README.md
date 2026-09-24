@@ -129,36 +129,46 @@ User ──────── owns ──────────── Board
 
 ## 🐳 Docker & ZimaOS Deployment
 
-### Build image locally
+### Opción 1: Instalar en ZimaOS / CasaOS (Recomendado)
+
+1. En tu panel de **ZimaOS / CasaOS**, abre la **App Store**.
+2. Haz clic en **Custom Install** (o el botón `+` en la esquina superior derecha).
+3. Haz clic en el botón de importar (`Import`) en la esquina superior derecha del diálogo.
+4. Pega el contenido de [zimaos-compose.yml](file:///zimaos-compose.yml) o arrastra el archivo.
+5. Revisa las variables de entorno:
+   - `NEXTAUTH_URL`: Cámbialo a la URL de tu ZimaOS (ejemplo: `http://192.168.1.50:3004`).
+   - `NEXTAUTH_SECRET`: Coloca una clave secreta aleatoria para sesiones.
+6. Haz clic en **Submit / Instalar**. ¡Listo!
+
+### Opción 2: Usar la imagen preconstruida de GitHub (GHCR) con Docker Compose
+
 ```bash
-docker build -t mytrello-acdev .
+docker compose up -d
 ```
 
-### Save image to file (for transfer to ZimaOS)
+La imagen pública generada automáticamente por GitHub Actions está disponible en:
+```
+ghcr.io/wadewatts9/mytrello:latest
+```
+
+### Opción 3: Construir la imagen localmente
 ```bash
-docker save mytrello-acdev:latest | gzip > mytrello-acdev.tar.gz
+docker build -t ghcr.io/wadewatts9/mytrello:latest .
+docker compose up -d
 ```
 
-### Load on ZimaOS
-```bash
-docker load < mytrello-acdev.tar.gz
-docker-compose up -d
-```
+### Variables de Entorno
+| Variable          | Por Defecto             | Descripción                                      |
+|-------------------|-------------------------|--------------------------------------------------|
+| `NEXTAUTH_URL`    | `http://localhost:3004` | URL completa accesible de la aplicación          |
+| `NEXTAUTH_SECRET` | `changeme...`           | Clave secreta para firmar sesiones JWT           |
+| `DATABASE_URL`    | `file:/app/data/dev.db` | Ruta SQLite (persistida en el volumen de datos)  |
+| `PORT`            | `3004`                  | Puerto HTTP del contenedor                       |
 
-### Environment Variables
-| Variable          | Default                | Description                         |
-|-------------------|------------------------|-------------------------------------|
-| `NEXTAUTH_URL`    | `http://localhost:3004`| Full URL of the application          |
-| `NEXTAUTH_SECRET` | `changeme_in_production`| JWT signing secret — **change this** |
-| `DATABASE_URL`    | `file:/app/data/dev.db`| SQLite path (auto-mounted volume)    |
-| `PORT`            | `3004`                 | Server port                          |
-
-### Persistent Data Volume
-All data (database + uploaded images) is stored in a named Docker volume:
-```yaml
-volumes:
-  mytrello_data:    # Maps to /app/data inside the container
-```
+### Volumen Persistente
+Todos los datos (base de datos SQLite y archivos) se almacenan en:
+- En ZimaOS: `/DATA/AppData/mytrello/data`
+- En Docker Compose estándar: Volumen nombrado `mytrello_data` (mapeado a `/app/data`)
 
 ---
 

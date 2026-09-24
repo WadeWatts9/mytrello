@@ -1,8 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "🔄 Running database migrations..."
-npx prisma db push --schema=./prisma/schema.prisma
+# Asegurar permisos correctos en el directorio persistente (para ZimaOS / CasaOS)
+mkdir -p /app/data
+chown -R nextjs:nodejs /app/data
 
-echo "🚀 Starting MyTrello on port 3004..."
-exec node server.js
+echo "🔄 Initializing / updating database schema..."
+su-exec nextjs:nodejs prisma db push --schema=./prisma/schema.prisma --accept-data-loss
+
+echo "🚀 Starting MyTrello on port ${PORT:-3004}..."
+exec su-exec nextjs:nodejs node server.js

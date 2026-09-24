@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  mytrello:
+    image: ghcr.io/wadewatts9/mytrello:latest
+    container_name: mytrello
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    volumes:
+      - /DATA/AppData/mytrello/data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3004
+      - NEXTAUTH_URL=http://localhost:3004
+      - NEXTAUTH_SECRET=mytrello_super_secret_session_key_zimaos
+    x-casaos:
+      envs:
+        - container: NEXTAUTH_URL
+          description:
+            en_us: "The complete URL to access your app (e.g., http://<ZIMAOS-IP>:3004)"
+        - container: NEXTAUTH_SECRET
+          description:
+            en_us: "Random string secret for session signing"
+      volumes:
+        - container: /app/data
+          description:
+            en_us: "Persistent data directory for SQLite database"
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: mytrello
+  description:
+    en_us: "Self-hosted Trello-like Kanban board built with Next.js, SQLite, and Prisma."
+  tagline:
+    en_us: "Kanban board for task and project management"
+  developer: "WadeWatts"
+  author: "WadeWatts"
+  icon: "https://raw.githubusercontent.com/Walkx-Code/Dashboard-Icons/main/png/trello.png"
+  thumbnail: ""
+  title:
+    en_us: "MyTrello"
+  category: "Productivity"
+  port_map: "3004"
+  scheme: "http"
+  index: "/"
