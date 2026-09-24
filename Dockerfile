@@ -25,15 +25,24 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/bcrypt ./node_modules/bcrypt
 
-# SQLite database will be mounted here
+# Persistent data volume for SQLite + uploaded files
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
 ENV DATABASE_URL="file:/app/data/dev.db"
+ENV PORT=3004
+ENV HOSTNAME="0.0.0.0"
+
+# Startup: push schema (creates db if not exists), then start app
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
 
 USER nextjs
 
 EXPOSE 3004
-ENV PORT=3004
-ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["./start.sh"]
