@@ -1,10 +1,10 @@
 #!/bin/sh
 set -e
 
-# Asegurar que el directorio de datos persistentes exista y tenga permisos (vital para ZimaOS / CasaOS)
-mkdir -p /app/data /app/prisma
+# Asegurar que el directorio de datos persistentes y uploads existan y tengan permisos (vital para ZimaOS / CasaOS)
+mkdir -p /app/data/uploads /app/prisma
 chown -R nextjs:nodejs /app/data /app/prisma
-chmod 777 /app/data
+chmod -R 777 /app/data
 
 export DATABASE_URL="${DATABASE_URL:-file:/app/data/dev.db}"
 
