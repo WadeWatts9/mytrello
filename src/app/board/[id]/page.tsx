@@ -29,12 +29,13 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
-  horizontalListSortingStrategy,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -61,6 +62,7 @@ interface CardItem {
   title: string;
   description: string | null;
   order: number;
+  archived?: boolean;
   columnId: string;
   tags: TagItem[];
   images: ImageItem[];
@@ -77,6 +79,9 @@ interface ColumnItem {
 interface BoardData {
   id: string;
   title: string;
+  description?: string | null;
+  coverImage?: string | null;
+  archivedCount?: number;
   ownerId: string;
   accessRole: "OWNER" | "EDITOR" | "VIEWER";
   owner: { id: string; name: string | null; email: string };
@@ -110,6 +115,74 @@ export default function BoardPage() {
   const [inviteRole, setInviteRole] = useState<"VIEWER" | "EDITOR">("EDITOR");
   const [shareError, setShareError] = useState("");
   const [shareSuccess, setShareSuccess] = useState("");
+
+  // Archive modal & state
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archivedCards, setArchivedCards] = useState<any[]>([]);
+  const [loadingArchive, setLoadingArchive] = useState(false);
+  const [archiveSearch, setArchiveSearch] = useState("");
+
+  async function loadArchivedCards() {
+    setLoadingArchive(true);
+    try {
+      const res = await fetch(`/api/boards/${boardId}/archive`);
+      if (res.ok) {
+        const data = await res.json();
+        setArchivedCards(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingArchive(false);
+    }
+  }
+
+  async function handleRestoreCard(cardId: string) {
+    try {
+      const res = await fetch(`/api/cards/${cardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: false }),
+      });
+      if (res.ok) {
+        const restored = await res.json();
+        setArchivedCards((prev) => prev.filter((c) => c.id !== cardId));
+        setBoard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            archivedCount: Math.max(0, (prev.archivedCount || 1) - 1),
+            columns: prev.columns.map((col) =>
+              col.id === restored.columnId
+                ? { ...col, cards: [...col.cards, restored] }
+                : col
+            ),
+          };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleDeleteArchivedCard(cardId: string) {
+    if (!confirm("¿Eliminar definitivamente esta tarjeta? Esta acción no se puede deshacer.")) return;
+    try {
+      const res = await fetch(`/api/cards/${cardId}`, { method: "DELETE" });
+      if (res.ok) {
+        setArchivedCards((prev) => prev.filter((c) => c.id !== cardId));
+        setBoard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            archivedCount: Math.max(0, (prev.archivedCount || 1) - 1),
+          };
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   // DnD sensors
   const sensors = useSensors(
@@ -237,7 +310,11 @@ export default function BoardPage() {
     }
   }
 
-  // DnD
+  function findColumn(cols: ColumnItem[], id: string) {
+    return cols.find((c) => c.id === id || c.cards.some((card) => card.id === id));
+  }
+
+  // DnD Handlers
   function handleDragStart(event: DragStartEvent) {
     if (isReadOnly) return;
     setActiveCardId(event.active.id as string);
@@ -252,36 +329,39 @@ export default function BoardPage() {
     const overId = over.id as string;
     if (activeId === overId) return;
 
-    let sourceCol: ColumnItem | undefined;
-    let targetCol: ColumnItem | undefined;
+    const activeCol = findColumn(board.columns, activeId);
+    const overCol = findColumn(board.columns, overId);
 
-    board.columns.forEach((col) => {
-      if (col.cards.some((c) => c.id === activeId)) sourceCol = col;
-      if (col.cards.some((c) => c.id === overId) || col.id === overId) targetCol = col;
-    });
-
-    if (!sourceCol || !targetCol || sourceCol === targetCol) return;
+    if (!activeCol || !overCol || activeCol.id === overCol.id) return;
 
     setBoard((prev) => {
       if (!prev) return prev;
-      const sCol = prev.columns.find((c) => c.id === sourceCol!.id);
-      const tCol = prev.columns.find((c) => c.id === targetCol!.id);
-      if (!sCol || !tCol) return prev;
+      const sIndex = prev.columns.findIndex((c) => c.id === activeCol.id);
+      const tIndex = prev.columns.findIndex((c) => c.id === overCol.id);
+      if (sIndex === -1 || tIndex === -1) return prev;
 
-      const cardIndex = sCol.cards.findIndex((c) => c.id === activeId);
-      if (cardIndex === -1) return prev;
+      const sCol = prev.columns[sIndex];
+      const tCol = prev.columns[tIndex];
 
-      const [cardToMove] = sCol.cards.splice(cardIndex, 1);
-      cardToMove.columnId = tCol.id;
+      const cIndex = sCol.cards.findIndex((c) => c.id === activeId);
+      if (cIndex === -1) return prev;
+
+      const cardToMove = { ...sCol.cards[cIndex], columnId: tCol.id };
+      const newSourceCards = sCol.cards.filter((c) => c.id !== activeId);
 
       const overIndex = tCol.cards.findIndex((c) => c.id === overId);
+      const newTargetCards = [...tCol.cards];
       if (overIndex >= 0) {
-        tCol.cards.splice(overIndex, 0, cardToMove);
+        newTargetCards.splice(overIndex, 0, cardToMove);
       } else {
-        tCol.cards.push(cardToMove);
+        newTargetCards.push(cardToMove);
       }
 
-      return { ...prev, columns: [...prev.columns] };
+      const nextCols = [...prev.columns];
+      nextCols[sIndex] = { ...sCol, cards: newSourceCards };
+      nextCols[tIndex] = { ...tCol, cards: newTargetCards };
+
+      return { ...prev, columns: nextCols };
     });
   }
 
@@ -295,25 +375,29 @@ export default function BoardPage() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    let currentCol: ColumnItem | undefined;
-    board.columns.forEach((col) => {
-      if (col.cards.some((c) => c.id === activeId)) currentCol = col;
-    });
+    const activeCol = findColumn(board.columns, activeId);
+    const overCol = findColumn(board.columns, overId);
 
-    if (!currentCol) return;
+    if (!activeCol) return;
 
-    const oldIndex = currentCol.cards.findIndex((c) => c.id === activeId);
-    const newIndex = currentCol.cards.findIndex((c) => c.id === overId);
+    const finalCol = overCol || activeCol;
+    const oldIndex = activeCol.cards.findIndex((c) => c.id === activeId);
+    const newIndex = finalCol.cards.findIndex((c) => c.id === overId);
 
-    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+    if (activeCol.id === finalCol.id && oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
       setBoard((prev) => {
         if (!prev) return prev;
-        const col = prev.columns.find((c) => c.id === currentCol!.id);
-        if (!col) return prev;
-        col.cards = arrayMove(col.cards, oldIndex, newIndex);
-        return { ...prev, columns: [...prev.columns] };
+        const colIndex = prev.columns.findIndex((c) => c.id === finalCol.id);
+        if (colIndex === -1) return prev;
+        const col = prev.columns[colIndex];
+        const reordered = arrayMove(col.cards, oldIndex, newIndex);
+        const nextCols = [...prev.columns];
+        nextCols[colIndex] = { ...col, cards: reordered };
+        return { ...prev, columns: nextCols };
       });
     }
+
+    const targetIndex = newIndex >= 0 ? newIndex : finalCol.cards.length - 1;
 
     try {
       await fetch("/api/cards", {
@@ -321,12 +405,12 @@ export default function BoardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cardId: activeId,
-          targetColumnId: currentCol.id,
-          newOrder: newIndex >= 0 ? newIndex : 0,
+          targetColumnId: finalCol.id,
+          newOrder: Math.max(0, targetIndex),
         }),
       });
     } catch (err) {
-      console.error(err);
+      console.error("Error al persistir movimiento de tarjeta:", err);
     }
   }
 
@@ -484,6 +568,19 @@ export default function BoardPage() {
               ))}
             </div>
           )}
+
+          {/* Archive Button */}
+          <button
+            onClick={() => {
+              loadArchivedCards();
+              setShowArchiveModal(true);
+            }}
+            className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+            title="Ver tarjetas archivadas de este tablero"
+          >
+            <span className="material-symbols-outlined text-sm text-[#d2bbff]">inventory_2</span>
+            <span>📦 Archivo ({board.archivedCount || 0})</span>
+          </button>
 
           {/* Manage Members Button */}
           {!isReadOnly && (
@@ -651,6 +748,34 @@ export default function BoardPage() {
             });
             setSelectedCard(null);
           }}
+          onCardArchived={(archivedId) => {
+            setBoard((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                archivedCount: (prev.archivedCount || 0) + 1,
+                columns: prev.columns.map((col) => ({
+                  ...col,
+                  cards: col.cards.filter((c) => c.id !== archivedId),
+                })),
+              };
+            });
+            setSelectedCard(null);
+          }}
+        />
+      )}
+
+      {/* Modal: Archive */}
+      {showArchiveModal && (
+        <ArchiveModal
+          isReadOnly={isReadOnly}
+          cards={archivedCards}
+          loading={loadingArchive}
+          search={archiveSearch}
+          onSearchChange={setArchiveSearch}
+          onRestore={handleRestoreCard}
+          onDelete={handleDeleteArchivedCard}
+          onClose={() => setShowArchiveModal(false)}
         />
       )}
 
@@ -858,10 +983,17 @@ function KanbanColumn({
   setCardTitleInput: (val: string) => void;
   onCardClick: (card: CardItem) => void;
 }) {
+  const { setNodeRef } = useDroppable({
+    id: column.id,
+  });
+
   const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
 
   return (
-    <div className="w-[316px] shrink-0 max-h-full flex flex-col rounded-2xl bg-[rgba(18,11,36,0.65)] backdrop-blur-[24px] border border-white/5 shadow-xl shadow-[#100b1c]/50">
+    <div
+      ref={setNodeRef}
+      className="w-[316px] shrink-0 max-h-full flex flex-col rounded-2xl bg-[rgba(18,11,36,0.65)] backdrop-blur-[24px] border border-white/5 shadow-xl shadow-[#100b1c]/50"
+    >
       {/* Column Header */}
       <div className="sticky top-0 z-10 px-4 py-3.5 border-b border-[#4a4455]/20 flex items-center justify-between backdrop-blur-xl rounded-t-2xl">
         <div className="flex items-center gap-2">
@@ -886,8 +1018,8 @@ function KanbanColumn({
       </div>
 
       {/* Cards list */}
-      <div className="p-3 overflow-y-auto space-y-3.5 flex-1 max-h-[calc(100vh-270px)]">
-        <SortableContext items={cardIds} strategy={horizontalListSortingStrategy}>
+      <div className="p-3 overflow-y-auto space-y-3.5 flex-1 min-h-[140px] max-h-[calc(100vh-270px)]">
+        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <SortableCard
               key={card.id}
@@ -897,6 +1029,11 @@ function KanbanColumn({
             />
           ))}
         </SortableContext>
+        {cards.length === 0 && (
+          <div className="h-28 border-2 border-dashed border-[#7c3aed]/25 rounded-xl flex items-center justify-center text-xs text-[#958da1] p-3 text-center">
+            Arrastra tarjetas aquí
+          </div>
+        )}
       </div>
 
       {/* Add Card Inline Input */}
@@ -1052,12 +1189,14 @@ function CardDetailModal({
   onClose,
   onCardUpdated,
   onCardDeleted,
+  onCardArchived,
 }: {
   card: CardItem;
   isReadOnly: boolean;
   onClose: () => void;
   onCardUpdated: (updated: CardItem) => void;
   onCardDeleted: (deletedId: string) => void;
+  onCardArchived: (archivedId: string) => void;
 }) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description || "");
@@ -1073,6 +1212,22 @@ function CardDetailModal({
   const [linkTitleInput, setLinkTitleInput] = useState("");
 
   const [saving, setSaving] = useState(false);
+
+  async function handleArchive() {
+    if (isReadOnly || !confirm("¿Archivar esta tarjeta? Podrás consultarla o recuperarla desde el archivo del tablero.")) return;
+    try {
+      const res = await fetch(`/api/cards/${card.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (res.ok) {
+        onCardArchived(card.id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function handleSave() {
     if (isReadOnly || !title.trim()) return;
@@ -1360,13 +1515,26 @@ function CardDetailModal({
         {/* Modal Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-white/10">
           {!isReadOnly ? (
-            <button
-              onClick={handleDelete}
-              className="text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1.5"
-            >
-              <IconTrash className="w-4 h-4" />
-              <span>Eliminar Tarjeta</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleArchive}
+                className="text-xs font-semibold text-[#d2bbff] hover:text-white flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#7c3aed]/20 hover:bg-[#7c3aed]/35 border border-[#7c3aed]/35 transition-all cursor-pointer"
+                title="Archivar tarjeta"
+              >
+                <span className="material-symbols-outlined text-sm text-[#d2bbff]">archive</span>
+                <span>Archivar</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-red-500/10 transition-all cursor-pointer"
+              >
+                <IconTrash className="w-4 h-4" />
+                <span>Eliminar</span>
+              </button>
+            </div>
           ) : <div />}
 
           <div className="flex items-center gap-2">
@@ -1386,6 +1554,140 @@ function CardDetailModal({
               </button>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------- Archive Modal (Board Archive) -----------------
+function ArchiveModal({
+  isReadOnly,
+  cards,
+  loading,
+  search,
+  onSearchChange,
+  onRestore,
+  onDelete,
+  onClose,
+}: {
+  isReadOnly: boolean;
+  cards: any[];
+  loading: boolean;
+  search: string;
+  onSearchChange: (s: string) => void;
+  onRestore: (cardId: string) => void;
+  onDelete: (cardId: string) => void;
+  onClose: () => void;
+}) {
+  const filtered = cards.filter((c) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      c.title.toLowerCase().includes(q) ||
+      (c.description && c.description.toLowerCase().includes(q)) ||
+      c.column?.title?.toLowerCase().includes(q) ||
+      c.tags?.some((t: any) => t.name.toLowerCase().includes(q))
+    );
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="glass-modal max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="p-5 border-b border-[#4a4455]/30 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-[#d2bbff] text-xl">inventory_2</span>
+            <div>
+              <h3 className="text-base font-bold text-white">Archivo del Tablero</h3>
+              <p className="text-xs text-[#958da1]">
+                Tarjetas archivadas • Puedes restaurarlas a su columna en cualquier momento
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-[#958da1] hover:text-white p-1 cursor-pointer">
+            <IconX className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Search Input */}
+        <div className="p-4 border-b border-white/5">
+          <input
+            type="text"
+            placeholder="Buscar tarjetas archivadas por título, descripción, hashtag o columna..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="glass-input w-full px-3.5 py-2 rounded-xl text-xs"
+          />
+        </div>
+
+        {/* Cards List */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-[#7c3aed] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 space-y-2">
+              <span className="material-symbols-outlined text-3xl text-[#958da1]">inventory_2</span>
+              <p className="text-xs text-[#958da1]">No hay tarjetas archivadas que coincidan</p>
+            </div>
+          ) : (
+            filtered.map((card) => (
+              <div
+                key={card.id}
+                className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-white/10 transition-colors"
+              >
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#7c3aed]/20 text-[#d2bbff]">
+                      Col: {card.column?.title || "Columna"}
+                    </span>
+                    {card.tags?.map((t: any) => (
+                      <span key={t.id} className="text-[10px] font-mono text-[#cebdff]">
+                        #{t.name}
+                      </span>
+                    ))}
+                  </div>
+                  <h4 className="text-sm font-semibold text-white truncate">{card.title}</h4>
+                  {card.description && (
+                    <p className="text-xs text-[#958da1] line-clamp-1">{card.description}</p>
+                  )}
+                </div>
+
+                {!isReadOnly && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => onRestore(card.id)}
+                      className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-emerald-200 cursor-pointer"
+                      title="Restaurar al tablero"
+                    >
+                      <span className="material-symbols-outlined text-sm">unarchive</span>
+                      <span>Restaurar</span>
+                    </button>
+                    <button
+                      onClick={() => onDelete(card.id)}
+                      className="p-2 rounded-xl text-[#958da1] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      title="Eliminar definitivamente"
+                    >
+                      <IconTrash className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-white/10 flex items-center justify-between text-xs text-[#958da1]">
+          <span>{filtered.length} tarjetas archivadas</span>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+          >
+            Cerrar
+          </button>
         </div>
       </div>
     </div>

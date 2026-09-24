@@ -183,14 +183,34 @@ export default function Navbar({
         {/* User Profile Avatar with violet glowing indicator */}
         {user && (
           <div className="flex items-center gap-2 pl-2 border-l border-[#4a4455]/30">
-            <div className="relative group cursor-pointer" title={`${user.name} (${user.email})`}>
+            <Link
+              href="/profile"
+              className="relative group cursor-pointer flex items-center gap-2 hover:opacity-90 transition-opacity"
+              title={`Ver perfil: ${user.name || user.email}`}
+            >
               <div className="w-9 h-9 rounded-full ring-2 ring-[#7c3aed] ring-offset-2 ring-offset-[#161121] overflow-hidden bg-[#2d2739] flex items-center justify-center text-white text-xs font-bold shadow-lg">
-                {user.name ? user.name[0] : user.email ? user.email[0].toUpperCase() : "U"}
+                {user.image ? (
+                  <img src={user.image} alt={user.name || "User"} className="w-full h-full object-cover" />
+                ) : user.name ? (
+                  user.name[0].toUpperCase()
+                ) : user.email ? (
+                  user.email[0].toUpperCase()
+                ) : (
+                  "U"
+                )}
               </div>
               <span className="absolute -bottom-1 -right-1 px-1 py-0.2 text-[8px] font-mono uppercase font-black bg-[#383244] text-[#cebdff] border border-[#4a4455] rounded shadow-sm">
                 {user.role === "ADMIN" ? "Adm" : "Usr"}
               </span>
-            </div>
+            </Link>
+
+            <Link
+              href="/profile"
+              title="Mi Perfil"
+              className="hidden md:flex p-2 rounded-xl text-[#958da1] hover:text-[#d2bbff] hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg">account_circle</span>
+            </Link>
 
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}

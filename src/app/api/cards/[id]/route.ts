@@ -67,6 +67,39 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+// PATCH /api/cards/[id] - Partial update of card (e.g. archive, title, description, columnId)
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const body = await req.json();
+
+  const updateData: any = {};
+  if (body.title !== undefined) updateData.title = body.title.trim();
+  if (body.description !== undefined) updateData.description = body.description;
+  if (body.columnId !== undefined) updateData.columnId = body.columnId;
+  if (body.order !== undefined) updateData.order = body.order;
+  if (body.archived !== undefined) updateData.archived = Boolean(body.archived);
+
+  try {
+    const updated = await prisma.card.update({
+      where: { id },
+      data: updateData,
+      include: {
+        tags: true,
+        links: true,
+        images: true,
+        column: { select: { id: true, title: true } },
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to update card" }, { status: 500 });
+  }
+}
+
 // DELETE /api/cards/[id] - Delete a card
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);

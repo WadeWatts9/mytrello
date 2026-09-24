@@ -4,18 +4,20 @@ import { useEffect, useState } from "react";
 import { IconSun, IconMoon } from "./Icons";
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldBeDark = savedTheme ? savedTheme === "dark" : systemPrefersDark;
+    // Default to dark mode unless user explicitly selected light
+    const shouldBeDark = savedTheme ? savedTheme === "dark" : true;
 
     setIsDark(shouldBeDark);
     if (shouldBeDark) {
       document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
     } else {
       document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
     }
   }, []);
 
@@ -24,9 +26,11 @@ export default function ThemeToggle() {
     setIsDark(nextDark);
     if (nextDark) {
       document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
       localStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
       localStorage.setItem("theme", "light");
     }
   };
@@ -34,10 +38,15 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
+      type="button"
       title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      className="p-2 rounded-xl bg-white/20 dark:bg-slate-800/60 hover:bg-white/30 dark:hover:bg-slate-700/60 border border-white/20 dark:border-white/10 text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center cursor-pointer shadow-sm hover:scale-105"
+      className="p-2 rounded-xl bg-white/10 dark:bg-[#2d2739]/60 hover:bg-[#7c3aed]/20 border border-[#7c3aed]/30 text-[#cebdff] transition-all flex items-center justify-center cursor-pointer shadow-sm hover:scale-105"
     >
-      {isDark ? <IconSun className="w-5 h-5 text-amber-400" /> : <IconMoon className="w-5 h-5 text-indigo-600" />}
+      {isDark ? (
+        <span className="material-symbols-outlined text-lg text-amber-300">light_mode</span>
+      ) : (
+        <span className="material-symbols-outlined text-lg text-[#7c3aed]">dark_mode</span>
+      )}
     </button>
   );
 }

@@ -26,6 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         orderBy: { order: "asc" },
         include: {
           cards: {
+            where: { archived: false },
             orderBy: { order: "asc" },
             include: {
               tags: true,
@@ -42,6 +43,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Board not found" }, { status: 404 });
   }
 
+  // Count archived cards in this board
+  const archivedCount = await prisma.card.count({
+    where: {
+      column: { boardId: id },
+      archived: true,
+    },
+  });
+
   // Check access: Owner, Member, or Admin
   const isOwner = board.ownerId === userId;
   const member = board.members.find((m) => m.userId === userId);
@@ -53,7 +62,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const accessRole = isOwner || isAdmin ? "OWNER" : member?.role || "VIEWER";
 
-  return NextResponse.json({ ...board, accessRole });
+  return NextResponse.json({ ...board, accessRole, archivedCount });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +74,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const userId = (session.user as any).id;
   const userRole = (session.user as any).role;
-  const { title } = await req.json();
+  const body = await req.json();
 
   const board = await prisma.board.findUnique({
     where: { id },
@@ -84,9 +93,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Only owners, editors, or admins can edit board settings" }, { status: 403 });
   }
 
+  const updateData: any = {};
+  if (body.title !== undefined && body.title.trim()) updateData.title = body.title.trim();
+  if (body.description !== undefined) updateData.description = body.description ? body.description.trim() : null;
+  if (body.coverImage !== undefined) updateData.coverImage = body.coverImage ? body.coverImage.trim() : null;
+  if (body.archived !== undefined) updateData.archived = Boolean(body.archived);
+
   const updated = await prisma.board.update({
     where: { id },
-    data: { title: title.trim() },
+    data: updateData,
   });
 
   return NextResponse.json(updated);

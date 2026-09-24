@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   }
 
   const userId = (session.user as any).id;
-  const { title } = await req.json();
+  const { title, description, coverImage } = await req.json();
 
   if (!title || !title.trim()) {
     return NextResponse.json({ error: "Board title is required" }, { status: 400 });
@@ -67,12 +67,14 @@ export async function POST(req: Request) {
   const board = await prisma.board.create({
     data: {
       title: title.trim(),
+      description: description ? description.trim() : null,
+      coverImage: coverImage ? coverImage.trim() : null,
       ownerId: userId,
       columns: {
         create: [
-          { title: "To Do", order: 0 },
-          { title: "In Progress", order: 1 },
-          { title: "Done", order: 2 },
+          { title: "Por Hacer", order: 0 },
+          { title: "En Progreso", order: 1 },
+          { title: "Finalizado", order: 2 },
         ],
       },
     },

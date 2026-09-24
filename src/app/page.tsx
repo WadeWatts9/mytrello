@@ -17,6 +17,9 @@ import {
 interface BoardItem {
   id: string;
   title: string;
+  description?: string | null;
+  coverImage?: string | null;
+  archived?: boolean;
   ownerId: string;
   owner: { id: string; name: string | null; email: string };
   members: { role: string; user: { id: string; name: string | null; email: string } }[];
@@ -37,6 +40,9 @@ export default function HomePage() {
   // Create board modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState("");
+  const [newBoardDesc, setNewBoardDesc] = useState("");
+  const [newBoardCover, setNewBoardCover] = useState("");
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const currentUser = session?.user as any;
@@ -80,6 +86,31 @@ export default function HomePage() {
     localStorage.setItem("favorite_boards", JSON.stringify(next));
   }
 
+  async function handleUploadCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setNewBoardCover(data.url);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
   async function handleCreateBoard(e: React.FormEvent) {
     e.preventDefault();
     if (!newBoardTitle.trim() || creating) return;
@@ -89,13 +120,19 @@ export default function HomePage() {
       const res = await fetch("/api/boards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newBoardTitle.trim() }),
+        body: JSON.stringify({
+          title: newBoardTitle.trim(),
+          description: newBoardDesc.trim() || undefined,
+          coverImage: newBoardCover.trim() || undefined,
+        }),
       });
 
       if (res.ok) {
         const created = await res.json();
         setShowCreateModal(false);
         setNewBoardTitle("");
+        setNewBoardDesc("");
+        setNewBoardCover("");
         router.push(`/board/${created.id}`);
       }
     } catch (err) {
@@ -379,82 +416,100 @@ export default function HomePage() {
                 <Link
                   key={board.id}
                   href={`/board/${board.id}`}
-                  className="glass-card p-5 h-56 flex flex-col justify-between group relative overflow-hidden"
+                  className="glass-card flex flex-col justify-between group relative overflow-hidden rounded-2xl min-h-[230px]"
                 >
-                  {/* Subtle top refraction line */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#7c3aed] via-[#cebdff] to-[#ae397b]" />
+                  {/* Subtle top refraction line or Cover Image */}
+                  {board.coverImage ? (
+                    <div className="relative w-full h-24 overflow-hidden shrink-0">
+                      <img
+                        src={board.coverImage}
+                        alt={board.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#161121] via-transparent to-black/30" />
+                    </div>
+                  ) : (
+                    <div className="h-1.5 w-full bg-gradient-to-r from-[#7c3aed] via-[#cebdff] to-[#ae397b]" />
+                  )}
 
-                  <div>
-                    {/* Header Row: Category Badge + Star + Delete */}
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/35">
-                        {isOwner ? "#Personal" : "#Compartido"}
-                      </span>
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Header Row: Category Badge + Star + Delete */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/35">
+                          {isOwner ? "#Personal" : "#Compartido"}
+                        </span>
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => toggleFavorite(e, board.id)}
-                          className="p-1 text-[#958da1] hover:text-amber-400 transition-colors"
-                          title="Favorito"
-                        >
-                          <span
-                            className={`material-symbols-outlined text-lg ${
-                              isFav ? "text-amber-400 fill-current" : ""
-                            }`}
-                          >
-                            star
-                          </span>
-                        </button>
-
-                        {canDelete && (
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={(e) => handleDeleteBoard(e, board)}
-                            className="p-1 text-[#958da1] hover:text-red-400 transition-colors"
-                            title="Eliminar tablero"
+                            onClick={(e) => toggleFavorite(e, board.id)}
+                            className="p-1 text-[#958da1] hover:text-amber-400 transition-colors"
+                            title="Favorito"
                           >
-                            <IconTrash className="w-4 h-4" />
+                            <span
+                              className={`material-symbols-outlined text-lg ${
+                                isFav ? "text-amber-400 fill-current" : ""
+                              }`}
+                            >
+                              star
+                            </span>
                           </button>
+
+                          {canDelete && (
+                            <button
+                              onClick={(e) => handleDeleteBoard(e, board)}
+                              className="p-1 text-[#958da1] hover:text-red-400 transition-colors"
+                              title="Eliminar tablero"
+                            >
+                              <IconTrash className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <h3 className="font-bold text-lg text-white group-hover:text-[#d2bbff] transition-colors line-clamp-1">
+                        {board.title}
+                      </h3>
+                      {board.description && (
+                        <p className="text-xs text-[#ccc3d8] mt-1 line-clamp-2">
+                          {board.description}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-[#958da1] mt-1">
+                        Por: {board.owner?.name || board.owner?.email}
+                      </p>
+                    </div>
+
+                    {/* Footer Row: Columns, Cards, Avatars */}
+                    <div className="pt-3 mt-3 border-t border-white/10 flex items-center justify-between text-xs text-[#ccc3d8]">
+                      <div className="flex items-center gap-2 text-[11px] font-mono">
+                        <span>{board.columns?.length || 0} col</span>
+                        <span>•</span>
+                        <span>{totalCards} tarjetas</span>
+                      </div>
+
+                      <div className="flex items-center -space-x-2">
+                        <div
+                          className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#7c3aed] text-white flex items-center justify-center text-[10px] font-bold"
+                          title={board.owner?.name || board.owner?.email}
+                        >
+                          {board.owner?.name ? board.owner.name[0] : "P"}
+                        </div>
+                        {board.members?.slice(0, 2).map((m, i) => (
+                          <div
+                            key={i}
+                            className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#4f319c] text-white flex items-center justify-center text-[10px] font-bold"
+                            title={m.user.name || m.user.email}
+                          >
+                            {m.user.name ? m.user.name[0] : "C"}
+                          </div>
+                        ))}
+                        {board.members && board.members.length > 2 && (
+                          <div className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#2d2739] text-[#ccc3d8] flex items-center justify-center text-[9px] font-bold">
+                            +{board.members.length - 2}
+                          </div>
                         )}
                       </div>
-                    </div>
-
-                    <h3 className="font-bold text-lg text-white group-hover:text-[#d2bbff] transition-colors line-clamp-1">
-                      {board.title}
-                    </h3>
-                    <p className="text-xs text-[#958da1] mt-1 line-clamp-2">
-                      Propietario: {board.owner?.name || board.owner?.email}
-                    </p>
-                  </div>
-
-                  {/* Footer Row: Columns, Cards, Avatars */}
-                  <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-[#ccc3d8]">
-                    <div className="flex items-center gap-2 text-[11px] font-mono">
-                      <span>{board.columns?.length || 0} col</span>
-                      <span>•</span>
-                      <span>{totalCards} tarjetas</span>
-                    </div>
-
-                    <div className="flex items-center -space-x-2">
-                      <div
-                        className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#7c3aed] text-white flex items-center justify-center text-[10px] font-bold"
-                        title={board.owner?.name || board.owner?.email}
-                      >
-                        {board.owner?.name ? board.owner.name[0] : "P"}
-                      </div>
-                      {board.members?.slice(0, 2).map((m, i) => (
-                        <div
-                          key={i}
-                          className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#4f319c] text-white flex items-center justify-center text-[10px] font-bold"
-                          title={m.user.name || m.user.email}
-                        >
-                          {m.user.name ? m.user.name[0] : "C"}
-                        </div>
-                      ))}
-                      {board.members && board.members.length > 2 && (
-                        <div className="w-7 h-7 rounded-full border-2 border-[#100b1c] bg-[#2d2739] text-[#ccc3d8] flex items-center justify-center text-[9px] font-bold">
-                          +{board.members.length - 2}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Link>
@@ -476,10 +531,10 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* Modal: Crear Tablero */}
+      {/* Modal: Crear Tablero con Portada y Descripción */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-modal max-w-md w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="glass-modal max-w-lg w-full p-6 space-y-5 rounded-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#d2bbff]">view_kanban</span>
@@ -496,7 +551,7 @@ export default function HomePage() {
             <form onSubmit={handleCreateBoard} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase text-[#ccc3d8] mb-1.5">
-                  Título del Tablero
+                  Título del Tablero *
                 </label>
                 <input
                   type="text"
@@ -509,8 +564,92 @@ export default function HomePage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold uppercase text-[#ccc3d8] mb-1.5">
+                  Descripción (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Objetivos clave, contexto del equipo o descripción del proyecto..."
+                  value={newBoardDesc}
+                  onChange={(e) => setNewBoardDesc(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2 rounded-xl text-xs resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-[#ccc3d8] mb-1.5">
+                  Imagen de Portada (Opcional)
+                </label>
+
+                {newBoardCover && (
+                  <div className="relative mb-2.5 h-28 w-full rounded-xl overflow-hidden ring-2 ring-[#7c3aed]">
+                    <img
+                      src={newBoardCover}
+                      alt="Portada seleccionada"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewBoardCover("")}
+                      className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 text-white hover:bg-red-500 transition-colors text-xs"
+                      title="Eliminar portada"
+                    >
+                      <IconX className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Cover Presets */}
+                <div className="grid grid-cols-4 gap-2 mb-2.5">
+                  {[
+                    { name: "Nebula", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80" },
+                    { name: "Cosmos", url: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=800&q=80" },
+                    { name: "Cyber", url: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=800&q=80" },
+                    { name: "Ocean", url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=800&q=80" },
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setNewBoardCover(preset.url)}
+                      className={`relative h-12 rounded-lg overflow-hidden border transition-all ${
+                        newBoardCover === preset.url
+                          ? "border-[#7c3aed] ring-2 ring-[#7c3aed] scale-105"
+                          : "border-white/10 hover:border-white/30"
+                      }`}
+                    >
+                      <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                      <span className="absolute inset-0 bg-black/40 flex items-center justify-center text-[10px] font-bold text-white">
+                        {preset.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="O introduce URL: https://..."
+                    value={newBoardCover}
+                    onChange={(e) => setNewBoardCover(e.target.value)}
+                    className="glass-input flex-1 px-3 py-1.5 rounded-xl text-xs"
+                  />
+                  <label className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer shrink-0">
+                    <span className="material-symbols-outlined text-sm text-[#d2bbff]">upload</span>
+                    <span>{uploadingCover ? "Subiendo..." : "Subir archivo"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadCover}
+                      className="hidden"
+                      disabled={uploadingCover}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <p className="text-xs text-[#958da1]">
-                Se crearán automáticamente las columnas estándar: <span className="text-[#d2bbff] font-semibold">Por Hacer</span>, <span className="text-[#cebdff] font-semibold">En Progreso</span> y <span className="text-emerald-400 font-semibold">Hecho</span>.
+                Se crearán automáticamente las columnas estándar: <span className="text-[#d2bbff] font-semibold">Por Hacer</span>, <span className="text-[#cebdff] font-semibold">En Progreso</span> y <span className="text-emerald-400 font-semibold">Finalizado</span>.
               </p>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-white/10">

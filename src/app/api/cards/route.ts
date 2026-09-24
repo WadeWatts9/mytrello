@@ -67,7 +67,7 @@ export async function PATCH(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { cardId, targetColumnId, newOrder } = await req.json();
+  const { cardId, targetColumnId, newOrder, archived } = await req.json();
 
   if (!cardId) {
     return NextResponse.json({ error: "Card ID is required" }, { status: 400 });
@@ -76,6 +76,7 @@ export async function PATCH(req: Request) {
   const updateData: any = {};
   if (targetColumnId) updateData.columnId = targetColumnId;
   if (newOrder !== undefined) updateData.order = newOrder;
+  if (archived !== undefined) updateData.archived = Boolean(archived);
 
   const card = await prisma.card.update({
     where: { id: cardId },
