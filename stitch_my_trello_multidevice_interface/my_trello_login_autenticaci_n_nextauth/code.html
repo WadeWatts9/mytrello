@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Acceso Seguro - My Trello | AetherKanban</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-lowest": "#100b1c",
+            "error": "#ffb4ab",
+            "surface-bright": "#3c3648",
+            "error-container": "#93000a",
+            "surface-container-highest": "#383244",
+            "primary": "#d2bbff",
+            "on-tertiary-container": "#ffdce9",
+            "surface": "#161121",
+            "secondary-fixed-dim": "#cebdff",
+            "tertiary-fixed": "#ffd8e7",
+            "primary-container": "#7c3aed",
+            "tertiary": "#ffafd3",
+            "background": "#161121",
+            "surface-variant": "#383244",
+            "on-secondary-fixed": "#21005e",
+            "outline-variant": "#4a4455",
+            "secondary": "#cebdff",
+            "secondary-fixed": "#e8ddff",
+            "on-primary-fixed-variant": "#5a00c6",
+            "tertiary-fixed-dim": "#ffafd3",
+            "surface-container-low": "#1e192a",
+            "primary-fixed": "#eaddff",
+            "on-error": "#690005",
+            "secondary-container": "#4f319c",
+            "outline": "#958da1",
+            "on-surface": "#e9def6",
+            "on-secondary": "#381385",
+            "inverse-on-surface": "#332d3f",
+            "on-background": "#e9def6",
+            "on-tertiary": "#620040",
+            "tertiary-container": "#ae397b",
+            "inverse-surface": "#e9def6",
+            "surface-dim": "#161121",
+            "inverse-primary": "#732ee4",
+            "on-error-container": "#ffdad6",
+            "on-tertiary-fixed-variant": "#85145a",
+            "on-secondary-fixed-variant": "#4f319c",
+            "surface-container-high": "#2d2739",
+            "surface-container": "#221d2e",
+            "on-surface-variant": "#ccc3d8",
+            "primary-fixed-dim": "#d2bbff",
+            "on-primary-container": "#ede0ff",
+            "surface-tint": "#d2bbff",
+            "on-tertiary-fixed": "#3d0026",
+            "on-secondary-container": "#bea8ff",
+            "on-primary-fixed": "#25005a",
+            "on-primary": "#3f008e"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin-desktop": "2rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "1.5rem",
+            "margin": "1rem",
+            "space-lg": "1.5rem",
+            "space-2xs": "0.125rem",
+            "space-2xl": "3rem",
+            "space-base": "1rem",
+            "space-md": "0.75rem",
+            "gutter": "1rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "display-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Inter"],
+            "title-md": ["Inter"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-lg": ["Inter"],
+            "body-md": ["Inter"],
+            "label-md": ["Plus Jakarta Sans"],
+            "display-lg-mobile": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "code-sm": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "display-lg": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.025em", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "title-md": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "600" }],
+            "headline-xl": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-lg": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.015em", "fontWeight": "600" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .glass-panel {
+      background: rgba(20, 11, 40, 0.78);
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
+      border-top: 1px solid rgba(255, 255, 255, 0.22);
+      border-left: 1px solid rgba(196, 181, 253, 0.18);
+      border-right: 1px solid rgba(124, 58, 237, 0.20);
+      border-bottom: 1px solid rgba(124, 58, 237, 0.35);
+      box-shadow: 0 24px 60px -8px rgba(0, 0, 0, 0.85), 0 0 35px 2px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .glass-input {
+      background: rgba(45, 27, 84, 0.35);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glass-input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      background: rgba(56, 30, 107, 0.55);
+      outline: none;
+    }
+    .glass-btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+    .glass-btn-secondary:hover {
+      background: rgba(124, 58, 237, 0.22);
+      border-color: rgba(196, 181, 253, 0.45);
+      box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-gradient {
+      background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%);
+      box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-gradient:hover {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+      box-shadow: 0 12px 30px -2px rgba(124, 58, 237, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      transform: translateY(-1px);
+    }
+    .btn-gradient:active {
+      transform: scale(0.98);
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface min-h-screen relative flex flex-col justify-between overflow-x-hidden selection:bg-primary-container selection:text-white">
+<!-- Atmospheric Glow Orbs -->
+<div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+<!-- Top-left deep radial glow -->
+<div class="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-primary-container/20 blur-[130px] mix-blend-screen animate-pulse" style="animation-duration: 8s;"></div>
+<!-- Center-right primary glow -->
+<div class="absolute top-1/4 -right-48 w-[580px] h-[580px] rounded-full bg-secondary-container/30 blur-[140px] mix-blend-screen"></div>
+<!-- Bottom-center ethereal illumination -->
+<div class="absolute -bottom-48 left-1/2 -translate-x-1/2 w-[720px] h-[500px] rounded-full bg-tertiary-container/15 blur-[160px] mix-blend-screen"></div>
+<!-- Subtle Grid overlay -->
+<div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(124,58,237,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(124,58,237,0.03)_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+</div>
+<!-- Header Brand Bar -->
+<header class="relative z-10 w-full px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-container to-secondary flex items-center justify-center shadow-lg shadow-primary-container/40 border border-white/20">
+<span class="material-symbols-outlined text-white text-2xl" data-icon="view_kanban">view_kanban</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-white tracking-tight">My Trello</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-code-sm text-primary bg-primary-container/20 border border-primary-container/40 font-semibold tracking-wider">AETHER</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant/70 leading-none mt-0.5">Core Architecture v3.42</p>
+</div>
+</div>
+<!-- State status pill -->
+<div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-low/70 border border-outline-variant/30 backdrop-blur-md">
+<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-400 -ml-4"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Servidor Activo • Docker NextAuth</span>
+</div>
+</header>
+<!-- Main Floating Glass Container -->
+<main class="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 my-2">
+<div class="w-full max-w-[460px] glass-panel rounded-2xl p-6 sm:p-8 relative">
+<!-- Top Subtle Refraction Accent -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent"></div>
+<!-- Card Title & Welcome Header -->
+<div class="text-center mb-7">
+<div class="inline-flex items-center justify-center p-2.5 rounded-2xl bg-primary-container/15 border border-primary-container/30 mb-3 text-primary shadow-inner">
+<span class="material-symbols-outlined text-3xl" data-icon="lock_open">lock_open</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-white font-bold tracking-tight">Iniciar Sesión</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1.5">Acceso seguro al espacio de trabajo colaborativo</p>
+</div>
+<!-- Federated OAuth NextAuth Section -->
+<div class="space-y-2.5 mb-6">
+<button class="w-full h-11 px-4 rounded-xl glass-btn-secondary flex items-center justify-center gap-3 text-white font-label-md text-label-md transition-all group" type="button">
+<svg class="w-5 h-5 fill-current text-white group-hover:scale-110 transition-transform" viewbox="0 0 24 24">
+<path clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" fill-rule="evenodd"></path>
+</svg>
+<span class="tracking-wide">Continuar con GitHub</span>
+</button>
+<button class="w-full h-11 px-4 rounded-xl glass-btn-secondary flex items-center justify-center gap-3 text-white font-label-md text-label-md transition-all group" type="button">
+<svg class="w-5 h-5 group-hover:scale-110 transition-transform" viewbox="0 0 24 24">
+<path d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" fill="#EA4335"></path>
+<path d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" fill="#4285F4"></path>
+<path d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9z" fill="#FBBC05"></path>
+<path d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" fill="#34A853"></path>
+</svg>
+<span class="tracking-wide">Continuar con Google</span>
+</button>
+</div>
+<!-- Divider with atmospheric text -->
+<div class="relative flex items-center justify-center mb-6">
+<div class="border-t border-outline-variant/30 w-full"></div>
+<span class="bg-surface-container-low px-3 py-1 rounded-full text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider relative border border-outline-variant/30">o con credenciales</span>
+<div class="border-t border-outline-variant/30 w-full"></div>
+</div>
+<!-- Credentials Form -->
+<form class="space-y-4" id="loginForm" onsubmit="event.preventDefault();">
+<!-- Field: Email or Username -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1.5 font-medium flex items-center justify-between" for="identifier">
+<span>Correo electrónico o Usuario</span>
+<span class="font-code-sm text-[11px] text-primary/70">NextAuth v4</span>
+</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60 pointer-events-none text-xl" data-icon="alternate_email">alternate_email</span>
+<input class="glass-input w-full pl-11 pr-4 py-2.5 rounded-xl font-body-md text-body-md text-white placeholder-on-surface-variant/40" id="identifier" name="identifier" placeholder="usuario@aetherkanban.local" required="" type="text" value="admin@aetherkanban.local"/>
+</div>
+</div>
+<!-- Field: Password -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="font-label-md text-label-md text-on-surface font-medium" for="password">Contraseña</label>
+<a class="font-body-sm text-body-sm text-primary hover:text-white transition-colors hover:underline" href="#">
+              ¿Olvidaste tu contraseña?
+            </a>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60 pointer-events-none text-xl" data-icon="key">key</span>
+<input class="glass-input w-full pl-11 pr-11 py-2.5 rounded-xl font-body-md text-body-md text-white placeholder-on-surface-variant/40" id="password" name="password" placeholder="••••••••••••" required="" type="password" value="KanbanSecret2025!"/>
+<button aria-label="Alternar visibilidad de contraseña" class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 hover:text-primary transition-colors p-1" id="togglePassword" type="button">
+<span class="material-symbols-outlined text-xl" data-icon="visibility" id="toggleIcon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Options: Remember & Session info -->
+<div class="flex items-center justify-between pt-1">
+<label class="flex items-center gap-2 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded bg-surface-container-high border-outline-variant text-primary-container focus:ring-primary-container focus:ring-offset-surface-container-lowest" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Recordar sesión (30 días)</span>
+</label>
+<span class="inline-flex items-center gap-1 font-code-sm text-[11px] text-on-surface-variant/60">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span> JWT Session
+          </span>
+</div>
+<!-- Submit Button -->
+<div class="pt-2">
+<button class="btn-gradient w-full py-3 px-4 rounded-xl text-white font-headline-sm text-[15px] font-semibold flex items-center justify-center gap-2 cursor-pointer" id="submitBtn" type="submit">
+<span>Iniciar Sesión</span>
+<span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Registration and Workspace Prompt -->
+<div class="mt-6 pt-4 border-t border-outline-variant/20 text-center">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          ¿No tienes credenciales de acceso?
+          <a class="text-primary font-semibold hover:text-white transition-colors ml-1 hover:underline" href="#">
+            Solicitar Invitación
+          </a>
+</p>
+</div>
+</div>
+</main>
+<!-- Persistent Technical Footer -->
+<footer class="relative z-10 w-full px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left border-t border-outline-variant/15 bg-surface-container-lowest/40 backdrop-blur-lg">
+<div class="flex flex-wrap items-center justify-center gap-2">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-low/80 border border-outline-variant/25 font-code-sm text-code-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="terminal">terminal</span>
+<span>Docker &amp; SQLite Persistence v3.42 - Puerto 3004</span>
+</div>
+<span class="hidden sm:inline text-outline-variant">•</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant/70">Ambiente de Producción Local</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant/60 font-body-sm text-body-sm">
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-base" data-icon="security">security</span>
+<span>Privacidad</span>
+</a>
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-base" data-icon="menu_book">menu_book</span>
+<span>Documentación</span>
+</a>
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-base" data-icon="contact_support">contact_support</span>
+<span>Soporte</span>
+</a>
+</div>
+</footer>
+<!-- Microinteractions Script -->
+<script>
+    // Password visibility toggle logic
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.getElementById('toggleIcon');
+
+    if (togglePasswordBtn && passwordInput && toggleIcon) {
+      togglePasswordBtn.addEventListener('click', () => {
+        const isPassword = passwordInput.getAttribute('type') === 'password';
+        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        toggleIcon.textContent = isPassword ? 'visibility_off' : 'visibility';
+        toggleIcon.setAttribute('data-icon', isPassword ? 'visibility_off' : 'visibility');
+      });
+    }
+
+    // Submit microinteraction button effect
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        const originalContent = submitBtn.innerHTML;
+        submitBtn.innerHTML = `
+          <span class="inline-block animate-spin material-symbols-outlined text-lg" data-icon="sync">sync</span>
+          <span>Autenticando en Docker...</span>
+        `;
+        submitBtn.classList.add('opacity-90', 'pointer-events-none');
+        
+        setTimeout(() => {
+          submitBtn.innerHTML = originalContent;
+          submitBtn.classList.remove('opacity-90', 'pointer-events-none');
+        }, 1200);
+      });
+    }
+  </script>
+</body></html>

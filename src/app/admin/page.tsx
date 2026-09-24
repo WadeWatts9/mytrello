@@ -213,20 +213,20 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-[#161121] text-[#e9def6] flex flex-col selection:bg-[#7c3aed] selection:text-white">
       <Navbar boardTitle="Panel de Control de Administrador" />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
               <span className="p-2 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
                 <IconCrown className="w-7 h-7" />
               </span>
               Administración de MyTrello
             </h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            <p className="text-slate-400 text-sm mt-1">
               Gestiona usuarios, permisos de acceso y supervisa todos los tableros del sistema.
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function AdminPage() {
               setErrorMsg("");
               setShowCreateModal(true);
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all hover:scale-[1.02] cursor-pointer w-fit"
+            className="primary-btn flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold shadow-lg transition-all hover:scale-[1.02] cursor-pointer w-fit"
           >
             <IconPlus className="w-5 h-5" />
             <span>Crear Usuario</span>

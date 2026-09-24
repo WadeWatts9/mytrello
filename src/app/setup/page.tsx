@@ -15,11 +15,11 @@ export default function SetupPage() {
     setError("");
 
     if (form.password !== form.confirm) {
-      setError("Passwords do not match.");
+      setError("Las contraseñas no coinciden.");
       return;
     }
     if (form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
 
@@ -36,124 +36,137 @@ export default function SetupPage() {
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || "Something went wrong.");
+        setError(data.error || "Ocurrió un error al configurar la cuenta.");
         return;
       }
 
-      // Setup complete — redirect to login
       router.push("/login?setup=done");
     } catch {
-      setError("Network error. Please try again.");
+      setError("Error de red. Intenta nuevamente.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-950 via-purple-900 to-indigo-800">
-      {/* Ambient blobs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-purple-600/20 blur-3xl" />
+    <main className="min-h-screen bg-[#100b1c] text-[#e9def6] relative flex flex-col justify-between overflow-x-hidden selection:bg-[#7c3aed] selection:text-white">
+      {/* Ambient background glow */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-[640px] h-[640px] rounded-full bg-[#7c3aed]/20 blur-[130px] mix-blend-screen" />
+        <div className="absolute top-1/4 -right-48 w-[580px] h-[580px] rounded-full bg-[#4f319c]/30 blur-[140px] mix-blend-screen" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md mx-4">
-        {/* Card */}
-        <div className="glass rounded-2xl p-8 shadow-2xl">
-          {/* Logo + Title */}
-          <div className="flex flex-col items-center mb-8">
+      {/* Header */}
+      <header className="relative z-10 w-full px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-tr from-[#7c3aed] to-[#cebdff] p-0.5 shadow-lg shadow-[#7c3aed]/40 border border-white/20">
             <Image
               src="/logo.png"
-              alt="MyTrello logo"
-              width={80}
-              height={80}
-              className="rounded-xl mb-4 shadow-lg"
+              alt="My Trello Logo"
+              width={40}
+              height={40}
+              className="w-full h-full object-cover rounded-[10px]"
             />
-            <h1 className="text-2xl font-bold text-white">Welcome to MyTrello</h1>
-            <p className="text-sm text-indigo-200 mt-1 text-center">
-              First-time setup — create your admin account
+          </div>
+          <div>
+            <span className="text-lg font-bold text-white tracking-tight">My Trello</span>
+            <p className="text-xs text-[#ccc3d8]/70 leading-none mt-0.5">Configuración Inicial</p>
+          </div>
+        </div>
+      </header>
+
+      {/* Setup Form Container */}
+      <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 my-2">
+        <div className="w-full max-w-[480px] glass-panel rounded-2xl p-6 sm:p-8 relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-[2px] bg-gradient-to-r from-transparent via-[#d2bbff] to-transparent" />
+
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center p-2 rounded-2xl bg-[#7c3aed]/15 border border-[#7c3aed]/30 mb-3 shadow-inner">
+              <Image
+                src="/logo.png"
+                alt="My Trello Logo"
+                width={52}
+                height={52}
+                className="rounded-xl shadow-md"
+              />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Bienvenido a My Trello</h1>
+            <p className="text-xs text-[#ccc3d8] mt-1">
+              Primer lanzamiento — Crea tu cuenta de Administrador principal
             </p>
           </div>
 
-          {/* Badge */}
-          <div className="flex items-center gap-2 bg-amber-400/10 border border-amber-400/30 rounded-lg px-3 py-2 mb-6">
-            <span className="text-amber-300 text-sm">🔐</span>
-            <span className="text-amber-200 text-xs">
-              This page will be <strong>permanently disabled</strong> once the admin account is created.
-            </span>
+          <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 rounded-xl px-3.5 py-2.5 mb-5 text-xs text-amber-200">
+            <span>🔐</span>
+            <span>Esta pantalla quedará permanentemente deshabilitada tras crear la cuenta.</span>
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-200 rounded-lg px-4 py-3 text-sm mb-4">
+            <div className="bg-red-500/15 border border-red-500/30 text-red-200 rounded-xl px-4 py-3 text-xs mb-4">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-sm font-medium text-indigo-200 mb-1">Full name</label>
+              <label className="block font-medium text-[#e9def6] mb-1">Nombre Completo</label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
                 placeholder="Alan Canto"
+                className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-indigo-200 mb-1">Email</label>
+              <label className="block font-medium text-[#e9def6] mb-1">Correo Electrónico</label>
               <input
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
-                placeholder="admin@yourdomain.com"
+                placeholder="admin@mitrello.local"
+                className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-indigo-200 mb-1">Password</label>
+              <label className="block font-medium text-[#e9def6] mb-1">Contraseña (mínimo 8 caracteres)</label>
               <input
                 type="password"
                 required
                 minLength={8}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
-                placeholder="Minimum 8 characters"
+                placeholder="••••••••••••"
+                className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-indigo-200 mb-1">Confirm password</label>
+              <label className="block font-medium text-[#e9def6] mb-1">Confirmar Contraseña</label>
               <input
                 type="password"
                 required
                 value={form.confirm}
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
-                placeholder="Repeat your password"
+                placeholder="••••••••••••"
+                className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 mt-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="primary-btn w-full py-3 px-4 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
             >
-              {loading ? "Creating admin account…" : "Create admin account →"}
+              <span>{loading ? "Creando cuenta..." : "Crear Cuenta de Administrador →"}</span>
             </button>
           </form>
         </div>
-
-        <p className="text-center text-indigo-300/50 text-xs mt-6">
-          MyTrello by ACDev · Secure self-hosted Kanban
-        </p>
       </div>
     </main>
   );
