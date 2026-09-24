@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3004
+      - DATABASE_URL=file:/app/data/dev.db
       - NEXTAUTH_URL=http://localhost:3004
       - NEXTAUTH_SECRET=mytrello_super_secret_session_key_zimaos
     x-casaos:
