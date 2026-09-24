@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mytrello:
+    build: .
+    image: mytrello-acdev:latest
+    container_name: mytrello
+    ports:
+      - "3004:3004"
+    volumes:
+      - mytrello_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3004
+      - NEXTAUTH_SECRET=changeme_in_production
+    restart: unless-stopped
+
+volumes:
+  mytrello_data:
