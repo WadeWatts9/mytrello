@@ -29,7 +29,11 @@ interface BoardItem {
   columns: {
     id: string;
     _count: { cards: number };
-    cards?: { tags?: { id: string; name: string }[] }[];
+    cards?: {
+      title?: string;
+      description?: string | null;
+      tags?: { id: string; name: string }[];
+    }[];
   }[];
   updatedAt: string;
 }
@@ -373,7 +377,7 @@ export default function HomePage() {
         (b.description && b.description.toLowerCase().includes(cleanSearch)) ||
         b.columns?.some((col) =>
           col.cards?.some((c) =>
-            c.title.toLowerCase().includes(cleanSearch) ||
+            (c.title && c.title.toLowerCase().includes(cleanSearch)) ||
             (c.description && c.description.toLowerCase().includes(cleanSearch)) ||
             c.tags?.some((t) =>
               t.name.toLowerCase().includes(cleanSearch) ||

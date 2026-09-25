@@ -44,6 +44,8 @@ export async function GET() {
           cards: {
             where: { archived: false },
             select: {
+              title: true,
+              description: true,
               tags: { select: { id: true, name: true } },
             },
           },
