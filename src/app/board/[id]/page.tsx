@@ -578,6 +578,29 @@ export default function BoardPage() {
     }
   }
 
+  async function handleRenameColumn(columnId: string, newTitle: string) {
+    if (isReadOnly || !board || !newTitle.trim()) return;
+    const cleanTitle = newTitle.trim();
+
+    setBoard((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        columns: prev.columns.map((c) => (c.id === columnId ? { ...c, title: cleanTitle } : c)),
+      };
+    });
+
+    try {
+      await fetch(`/api/boards/${boardId}/columns`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId, title: cleanTitle }),
+      });
+    } catch (err) {
+      console.error("Error al renombrar columna:", err);
+    }
+  }
+
   function findColumn(cols: ColumnItem[], id: string) {
     return cols.find((c) => c.id === id || c.cards.some((card) => card.id === id));
   }
@@ -1148,6 +1171,7 @@ export default function BoardPage() {
                   onTogglePin={handleTogglePinColumn}
                   onSetColor={handleSetColumnColor}
                   onMoveColumn={handleMoveColumn}
+                  onRenameColumn={handleRenameColumn}
                   isFirst={idx === 0}
                   isLast={idx === board.columns.length - 1}
                 />
@@ -1595,6 +1619,7 @@ function KanbanColumn({
   onTogglePin,
   onSetColor,
   onMoveColumn,
+  onRenameColumn,
   isFirst,
   isLast,
 }: {
@@ -1610,11 +1635,27 @@ function KanbanColumn({
   onTogglePin: (colId: string) => void;
   onSetColor: (colId: string, color: string) => void;
   onMoveColumn: (colId: string, direction: "left" | "right") => void;
+  onRenameColumn: (colId: string, newTitle: string) => void;
   isFirst: boolean;
   isLast: boolean;
 }) {
   const [showColorPalette, setShowColorPalette] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState(column.title);
   const colorTheme = COLUMN_COLORS[column.color || "default"] || COLUMN_COLORS.default;
+
+  useEffect(() => {
+    setEditTitleValue(column.title);
+  }, [column.title]);
+
+  const handleSaveTitle = () => {
+    if (editTitleValue.trim() && editTitleValue.trim() !== column.title) {
+      onRenameColumn(column.id, editTitleValue.trim());
+    } else {
+      setEditTitleValue(column.title);
+    }
+    setIsEditingTitle(false);
+  };
 
   const {
     attributes,
@@ -1653,13 +1694,13 @@ function KanbanColumn({
 
       {/* Column Header */}
       <div className="sticky top-0 z-10 px-3.5 py-3 border-b border-[#4a4455]/20 flex items-center justify-between backdrop-blur-xl">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {/* Drag handle for column reordering */}
           {!isReadOnly && (
             <div
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/10 text-[#958da1] hover:text-white transition-colors"
+              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/10 text-[#958da1] hover:text-white transition-colors shrink-0"
               title="Arrastrar para mover columna"
             >
               <span className="material-symbols-outlined text-sm leading-none">drag_indicator</span>
@@ -1667,16 +1708,74 @@ function KanbanColumn({
           )}
 
           <span className="text-base shrink-0">{column.pinned ? "📌" : iconEmoji}</span>
-          <h3 className={`text-sm font-bold truncate tracking-tight ${colorTheme.text}`}>
-            {column.title}
-          </h3>
+
+          {isEditingTitle ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveTitle();
+              }}
+              className="flex items-center gap-1 flex-1 min-w-0"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={editTitleValue}
+                onChange={(e) => setEditTitleValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setEditTitleValue(column.title);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                onBlur={handleSaveTitle}
+                className="glass-input px-2 py-0.5 text-xs font-bold text-white rounded-md w-full focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+              />
+              <button
+                type="submit"
+                className="text-emerald-400 hover:text-emerald-300 p-0.5 font-bold text-xs shrink-0 cursor-pointer"
+                title="Guardar nombre"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditTitleValue(column.title);
+                  setIsEditingTitle(false);
+                }}
+                className="text-[#958da1] hover:text-white p-0.5 font-bold text-xs shrink-0 cursor-pointer"
+                title="Cancelar"
+              >
+                ✕
+              </button>
+            </form>
+          ) : (
+            <div
+              onClick={() => {
+                if (!isReadOnly) setIsEditingTitle(true);
+              }}
+              className="flex items-center gap-1.5 min-w-0 cursor-pointer group/coltitle flex-1"
+              title={isReadOnly ? column.title : "Clic para renombrar columna"}
+            >
+              <h3 className={`text-sm font-bold truncate tracking-tight ${colorTheme.text}`}>
+                {column.title}
+              </h3>
+              {!isReadOnly && (
+                <span className="material-symbols-outlined text-[13px] text-[#958da1] opacity-0 group-hover/coltitle:opacity-100 transition-opacity shrink-0">
+                  edit
+                </span>
+              )}
+            </div>
+          )}
+
           <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739] text-[#ccc3d8] shrink-0">
             {cards.length}
           </span>
         </div>
 
         {/* Column Actions: Pin, Color, Reorder, Delete */}
-        <div className="flex items-center gap-0.5 relative">
+        <div className="flex items-center gap-0.5 relative shrink-0">
           {!isReadOnly && (
             <>
               {/* Quick Move Left */}
@@ -1699,6 +1798,16 @@ function KanbanColumn({
                 title="Mover a la derecha"
               >
                 <span className="text-[10px] font-bold">▶</span>
+              </button>
+
+              {/* Rename Column button */}
+              <button
+                type="button"
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/5 transition-colors"
+                title="Renombrar columna"
+              >
+                <span className="material-symbols-outlined text-xs leading-none">edit</span>
               </button>
 
               {/* Pin Column Toggle */}

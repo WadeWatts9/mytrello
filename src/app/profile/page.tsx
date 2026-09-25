@@ -39,10 +39,10 @@ export default function ProfilePage() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+    } else if (status === "authenticated" && !profile) {
       loadProfile();
     }
-  }, [status, router]);
+  }, [status, router, profile]);
 
   async function loadProfile() {
     try {
@@ -169,7 +169,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading || status === "loading") {
+  if (loading && !profile) {
     return (
       <div className="min-h-screen bg-[#161121] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
