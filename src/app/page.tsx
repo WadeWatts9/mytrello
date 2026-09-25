@@ -365,37 +365,46 @@ export default function HomePage() {
       : boards;
 
   const filteredBoards = currentTabList.filter((b) => {
-    const matchesSearch = search
-      ? b.title.toLowerCase().includes(search.toLowerCase()) ||
-        b.description?.toLowerCase().includes(search.toLowerCase())
+    const cleanSearch = search.trim().toLowerCase();
+    const tagQuery = cleanSearch.replace(/^#/, "");
+
+    const matchesSearch = cleanSearch
+      ? b.title.toLowerCase().includes(cleanSearch) ||
+        (b.description && b.description.toLowerCase().includes(cleanSearch)) ||
+        b.columns?.some((col) =>
+          col.cards?.some((c) =>
+            c.title.toLowerCase().includes(cleanSearch) ||
+            (c.description && c.description.toLowerCase().includes(cleanSearch)) ||
+            c.tags?.some((t) =>
+              t.name.toLowerCase().includes(cleanSearch) ||
+              t.name.toLowerCase().includes(tagQuery)
+            )
+          )
+        )
       : true;
 
     if (!selectedTag) return matchesSearch;
 
-    const tagLower = selectedTag.toLowerCase();
+    const tagLower = selectedTag.toLowerCase().replace(/^#/, "");
     const isOwner = b.ownerId === currentUser?.id;
 
     if (tagLower === "personal") {
-      if (isOwner) return matchesSearch;
+      return isOwner && matchesSearch;
     }
     if (tagLower === "compartido") {
-      if (!isOwner) return matchesSearch;
+      return !isOwner && matchesSearch;
     }
 
-    if (
+    const matchesBoardTag =
       b.title.toLowerCase().includes(tagLower) ||
-      b.description?.toLowerCase().includes(tagLower)
-    ) {
-      return matchesSearch;
-    }
+      (b.description && b.description.toLowerCase().includes(tagLower)) ||
+      b.columns?.some((col) =>
+        col.cards?.some((c) =>
+          c.tags?.some((t) => t.name.toLowerCase() === tagLower)
+        )
+      );
 
-    const hasTagInCards = b.columns?.some((col) =>
-      col.cards?.some((c) =>
-        c.tags?.some((t) => t.name.toLowerCase() === tagLower)
-      )
-    );
-
-    return hasTagInCards && matchesSearch;
+    return matchesBoardTag && matchesSearch;
   });
 
   if (loading || status === "loading") {

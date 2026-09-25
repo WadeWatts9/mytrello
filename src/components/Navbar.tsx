@@ -42,6 +42,21 @@ export default function Navbar({
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const el = document.getElementById("navbar-search-input") as HTMLInputElement;
+        if (el) {
+          el.focus();
+          el.select();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-2.5 w-full backdrop-blur-xl bg-[#100b1c]/85 border-b border-[#4a4455]/30 shadow-2xl shadow-[#100b1c]/60">
       {/* Brand & Board Selector */}
@@ -107,24 +122,37 @@ export default function Navbar({
         )}
       </div>
 
-      {/* Center Search Bar with Hashtag Support (from Stitch Design) */}
-      <div className="hidden lg:flex items-center flex-1 max-w-md mx-6">
-        <div className="relative w-full">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#958da1] text-lg pointer-events-none">
-            search
-          </span>
-          <input
-            type="text"
-            placeholder="Buscar tarjetas o tags (ej. #frontend #bug)..."
-            value={searchValue}
-            onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-            className="w-full bg-[#1e192a]/80 border border-[#4a4455]/30 rounded-xl pl-10 pr-12 py-1.5 text-xs text-white placeholder-[#958da1] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
-          />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#958da1] bg-[#2d2739] px-1.5 py-0.5 rounded border border-[#4a4455]/40">
-            ⌘K
-          </kbd>
+      {/* Center Search Bar with Hashtag Support */}
+      {onSearchChange && (
+        <div className="flex items-center flex-1 max-w-xs sm:max-w-sm md:max-w-md mx-2 sm:mx-6">
+          <div className="relative w-full">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#958da1] text-base pointer-events-none">
+              search
+            </span>
+            <input
+              id="navbar-search-input"
+              type="text"
+              placeholder="Buscar tarjetas o tags (ej. #frontend)..."
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full bg-[#1e192a]/80 border border-[#4a4455]/30 rounded-xl pl-9 pr-14 py-1.5 text-xs text-white placeholder-[#958da1] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] transition-all"
+            />
+            {searchValue ? (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                className="absolute right-7 top-1/2 -translate-y-1/2 text-[#958da1] hover:text-white p-0.5 cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                <span className="text-xs">✕</span>
+              </button>
+            ) : null}
+            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#958da1] bg-[#2d2739] px-1.5 py-0.5 rounded border border-[#4a4455]/40 pointer-events-none hidden sm:inline-block">
+              ⌘K
+            </kbd>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Right Controls & Status Badges */}
       <div className="flex items-center gap-3">

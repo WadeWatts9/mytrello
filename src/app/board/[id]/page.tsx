@@ -1142,13 +1142,26 @@ export default function BoardPage() {
             {board.columns.map((column, idx) => {
               const columnCards = column.cards.filter((c) => {
                 const matchesTag = selectedTag
-                  ? c.tags?.some((t) => t.name === selectedTag)
+                  ? c.tags?.some((t) => t.name.toLowerCase() === selectedTag.toLowerCase().replace(/^#/, ""))
                   : true;
-                const matchesSearch = searchFilter
-                  ? c.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                    c.tags?.some((t) => t.name.toLowerCase().includes(searchFilter.toLowerCase()))
-                  : true;
-                return matchesTag && matchesSearch;
+
+                if (!searchFilter.trim()) return matchesTag;
+
+                const query = searchFilter.trim().toLowerCase();
+                const tagQuery = query.replace(/^#/, "");
+
+                const titleMatch = c.title.toLowerCase().includes(query);
+                const descMatch = c.description ? c.description.toLowerCase().includes(query) : false;
+                const tagMatch = c.tags?.some((t) =>
+                  t.name.toLowerCase().includes(query) ||
+                  t.name.toLowerCase().includes(tagQuery)
+                );
+                const linkMatch = c.links?.some((l) =>
+                  (l.title && l.title.toLowerCase().includes(query)) ||
+                  l.url.toLowerCase().includes(query)
+                );
+
+                return matchesTag && (titleMatch || descMatch || tagMatch || linkMatch);
               });
 
               const emojiIcons = ["💡", "⚡", "🧪", "🚀", "✅", "📌", "🔥"];
@@ -2434,6 +2447,34 @@ function CardDetailModal({
 }
 
 // ----------------- Archive Modal (Board Archive) -----------------
+function formatArchiveDate(dateStr?: string | Date): string {
+  if (!dateStr) return "Fecha desconocida";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "Fecha desconocida";
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+
+  if (isToday) return "Hoy";
+  if (isYesterday) return "Ayer";
+
+  return d.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function ArchiveModal({
   isReadOnly,
   cards,
@@ -2453,20 +2494,41 @@ function ArchiveModal({
   onDelete: (cardId: string) => void;
   onClose: () => void;
 }) {
-  const filtered = cards.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      c.title.toLowerCase().includes(q) ||
-      (c.description && c.description.toLowerCase().includes(q)) ||
-      c.column?.title?.toLowerCase().includes(q) ||
-      c.tags?.some((t: any) => t.name.toLowerCase().includes(q))
-    );
-  });
+  const [previewCard, setPreviewCard] = useState<any | null>(null);
+
+  const filtered = useMemo(() => {
+    return cards.filter((c) => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      const tagQuery = q.replace(/^#/, "");
+      return (
+        c.title.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q)) ||
+        c.column?.title?.toLowerCase().includes(q) ||
+        c.tags?.some((t: any) =>
+          t.name.toLowerCase().includes(q) || t.name.toLowerCase().includes(tagQuery)
+        )
+      );
+    });
+  }, [cards, search]);
+
+  const groupedCards = useMemo(() => {
+    const groups: { dateLabel: string; items: any[] }[] = [];
+    filtered.forEach((card) => {
+      const label = formatArchiveDate(card.updatedAt);
+      let group = groups.find((g) => g.dateLabel === label);
+      if (!group) {
+        group = { dateLabel: label, items: [] };
+        groups.push(group);
+      }
+      group.items.push(card);
+    });
+    return groups;
+  }, [filtered]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="glass-modal max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="glass-modal max-w-3xl w-full max-h-[88vh] overflow-hidden flex flex-col rounded-2xl animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-5 border-b border-[#4a4455]/30 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -2474,7 +2536,7 @@ function ArchiveModal({
             <div>
               <h3 className="text-base font-bold text-white">Archivo del Tablero</h3>
               <p className="text-xs text-[#958da1]">
-                Tarjetas archivadas • Puedes restaurarlas a su columna en cualquier momento
+                Tarjetas archivadas organizadas por fecha • Haz clic en una tarjeta para previsualizarla antes de restaurarla
               </p>
             </div>
           </div>
@@ -2485,68 +2547,133 @@ function ArchiveModal({
 
         {/* Search Input */}
         <div className="p-4 border-b border-white/5">
-          <input
-            type="text"
-            placeholder="Buscar tarjetas archivadas por título, descripción, hashtag o columna..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="glass-input w-full px-3.5 py-2 rounded-xl text-xs"
-          />
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#958da1] text-base pointer-events-none">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar tarjetas archivadas por título, descripción, hashtag o columna..."
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="glass-input w-full pl-10 pr-10 py-2 rounded-xl text-xs"
+            />
+            {search ? (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#958da1] hover:text-white text-xs p-1"
+                title="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        {/* Cards List */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-3">
+        {/* Cards List Grouped by Date */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-6">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-4 border-[#7c3aed] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
-              <span className="material-symbols-outlined text-3xl text-[#958da1]">inventory_2</span>
-              <p className="text-xs text-[#958da1]">No hay tarjetas archivadas que coincidan</p>
+            <div className="text-center py-16 space-y-2">
+              <span className="material-symbols-outlined text-4xl text-[#958da1]">inventory_2</span>
+              <p className="text-xs text-[#ccc3d8]">No hay tarjetas archivadas que coincidan con la búsqueda</p>
             </div>
           ) : (
-            filtered.map((card) => (
-              <div
-                key={card.id}
-                className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-white/10 transition-colors"
-              >
-                <div className="space-y-1 flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#7c3aed]/20 text-[#d2bbff]">
-                      Col: {card.column?.title || "Columna"}
-                    </span>
-                    {card.tags?.map((t: any) => (
-                      <span key={t.id} className="text-[10px] font-mono text-[#cebdff]">
-                        #{t.name}
-                      </span>
-                    ))}
-                  </div>
-                  <h4 className="text-sm font-semibold text-white truncate">{card.title}</h4>
-                  {card.description && (
-                    <p className="text-xs text-[#958da1] line-clamp-1">{card.description}</p>
-                  )}
+            groupedCards.map((group) => (
+              <div key={group.dateLabel} className="space-y-3">
+                {/* Date Group Header */}
+                <div className="flex items-center gap-2 sticky top-0 bg-[#191325]/95 backdrop-blur-md py-1.5 z-10">
+                  <span className="material-symbols-outlined text-sm text-[#d2bbff]">calendar_today</span>
+                  <span className="text-xs font-bold text-[#cebdff] capitalize">{group.dateLabel}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#7c3aed]/25 text-[#d2bbff] border border-[#7c3aed]/30">
+                    {group.items.length} {group.items.length === 1 ? "tarjeta" : "tarjetas"}
+                  </span>
+                  <div className="flex-1 h-[1px] bg-white/10" />
                 </div>
 
-                {!isReadOnly && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => onRestore(card.id)}
-                      className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-emerald-200 cursor-pointer"
-                      title="Restaurar al tablero"
-                    >
-                      <span className="material-symbols-outlined text-sm">unarchive</span>
-                      <span>Restaurar</span>
-                    </button>
-                    <button
-                      onClick={() => onDelete(card.id)}
-                      className="p-2 rounded-xl text-[#958da1] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                      title="Eliminar definitivamente"
-                    >
-                      <IconTrash className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                {/* Cards in this Date Group */}
+                <div className="space-y-2.5">
+                  {group.items.map((card) => {
+                    const coverImg = card.images && card.images.length > 0 ? card.images[0].url : null;
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => setPreviewCard(card)}
+                        className="group p-3.5 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-[#7c3aed]/15 hover:border-[#7c3aed]/50 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                        title="Haz clic para previsualizar los detalles de esta tarjeta"
+                      >
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          {coverImg && (
+                            <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-[#100b1c]">
+                              <img src={coverImg} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/30">
+                                Col: {card.column?.title || "Columna"}
+                              </span>
+                              {card.tags?.map((t: any) => (
+                                <span key={t.id} className="text-[10px] font-mono text-[#cebdff]">
+                                  #{t.name}
+                                </span>
+                              ))}
+                            </div>
+
+                            <h4 className="text-sm font-semibold text-white truncate group-hover:text-[#d2bbff] transition-colors">
+                              {card.title}
+                            </h4>
+
+                            {card.description && (
+                              <p className="text-xs text-[#958da1] line-clamp-1">{card.description}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <span className="text-[11px] text-[#cebdff] font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-1">
+                            <span className="material-symbols-outlined text-xs">visibility</span>
+                            <span>Previsualizar</span>
+                          </span>
+
+                          {!isReadOnly && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRestore(card.id);
+                                }}
+                                className="secondary-glass-btn flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-emerald-200 cursor-pointer"
+                                title="Restaurar al tablero"
+                              >
+                                <span className="material-symbols-outlined text-sm">unarchive</span>
+                                <span>Restaurar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDelete(card.id);
+                                }}
+                                className="p-2 rounded-xl text-[#958da1] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                title="Eliminar definitivamente"
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))
           )}
@@ -2563,6 +2690,176 @@ function ArchiveModal({
           </button>
         </div>
       </div>
+
+      {/* Sub-Modal: Card Preview */}
+      {previewCard && (
+        <div
+          className="fixed inset-0 z-60 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setPreviewCard(null)}
+        >
+          <div
+            className="glass-modal max-w-xl w-full p-6 space-y-4 rounded-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Preview Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[#4a4455]/30 pb-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#7c3aed]/25 text-[#d2bbff] border border-[#7c3aed]/40">
+                    Columna original: {previewCard.column?.title || "Sin columna"}
+                  </span>
+                  <span className="text-[10px] font-mono text-[#958da1]">
+                    ID-{previewCard.id.slice(-4)}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white leading-snug">
+                  {previewCard.title}
+                </h3>
+                <p className="text-[11px] text-[#958da1] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">history</span>
+                  <span>
+                    Archivada el{" "}
+                    {new Date(previewCard.updatedAt).toLocaleDateString("es-ES", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewCard(null)}
+                className="text-[#958da1] hover:text-white p-1"
+                title="Cerrar previsualización"
+              >
+                <IconX className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold uppercase text-[#958da1] flex items-center gap-1">
+                <span className="material-symbols-outlined text-xs">notes</span>
+                <span>Descripción</span>
+              </h4>
+              {previewCard.description ? (
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#e9def6] leading-relaxed whitespace-pre-wrap">
+                  {previewCard.description}
+                </div>
+              ) : (
+                <p className="text-xs text-[#958da1] italic">Sin descripción</p>
+              )}
+            </div>
+
+            {/* Tags */}
+            {previewCard.tags && previewCard.tags.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase text-[#958da1] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">label</span>
+                  <span>Etiquetas / Hashtags</span>
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {previewCard.tags.map((t: any) => (
+                    <span
+                      key={t.id}
+                      className="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/30"
+                    >
+                      #{t.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Images */}
+            {previewCard.images && previewCard.images.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase text-[#958da1] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">image</span>
+                  <span>Imágenes Adjuntas ({previewCard.images.length})</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {previewCard.images.map((img: any, i: number) => (
+                    <a
+                      key={i}
+                      href={img.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl overflow-hidden h-28 border border-white/10 bg-[#100b1c] hover:opacity-90 transition-opacity block"
+                    >
+                      <img src={img.url} alt="" className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Links */}
+            {previewCard.links && previewCard.links.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold uppercase text-[#958da1] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">link</span>
+                  <span>Enlaces ({previewCard.links.length})</span>
+                </h4>
+                <div className="space-y-1.5">
+                  {previewCard.links.map((link: any, i: number) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-[#d2bbff] hover:underline"
+                    >
+                      <IconExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{link.title || link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Preview Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setPreviewCard(null)}
+                className="px-4 py-2 text-xs font-semibold text-[#958da1] hover:text-white"
+              >
+                Volver al listado
+              </button>
+
+              {!isReadOnly && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDelete(previewCard.id);
+                      setPreviewCard(null);
+                    }}
+                    className="px-3.5 py-2 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRestore(previewCard.id);
+                      setPreviewCard(null);
+                    }}
+                    className="primary-btn flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">unarchive</span>
+                    <span>Restaurar Tarjeta</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
