@@ -57,16 +57,8 @@ export default function Navbar({
             />
           </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-white tracking-tight leading-none">
-                My Trello
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono text-[#d2bbff] bg-[#7c3aed]/20 border border-[#7c3aed]/40 font-semibold tracking-wider">
-                AETHER
-              </span>
-            </div>
-            <span className="text-[11px] text-[#ccc3d8]/70 leading-none mt-1 hidden sm:inline">
-              Core Architecture v3.42
+            <span className="text-base font-bold text-white tracking-tight leading-none">
+              My Trello
             </span>
           </div>
         </Link>
@@ -136,17 +128,19 @@ export default function Navbar({
 
       {/* Right Controls & Status Badges */}
       <div className="flex items-center gap-3">
-        {/* Docker & SQLite Engine Status Badge (Stitch Feature) */}
-        <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#100b1c] border border-[#4a4455]/30 shadow-inner">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          <span className="text-[11px] font-mono flex items-center gap-1.5">
-            <span className="text-emerald-400 font-semibold">Docker: Running</span>
-            <span className="text-[#958da1]">(:3004 SQLite)</span>
-          </span>
-        </div>
+        {/* Docker & SQLite Engine Status Badge (Admin Only) */}
+        {isAdmin && (
+          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#100b1c] border border-[#4a4455]/30 shadow-inner">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-[11px] font-mono flex items-center gap-1.5">
+              <span className="text-emerald-400 font-semibold">Docker: Running</span>
+              <span className="text-[#958da1]">(:3004 SQLite)</span>
+            </span>
+          </div>
+        )}
 
         {/* Role Badge Indicator */}
         {boardRole && (

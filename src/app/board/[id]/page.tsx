@@ -38,6 +38,7 @@ import {
   arrayMove,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  horizontalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -75,6 +76,8 @@ interface ColumnItem {
   id: string;
   title: string;
   order: number;
+  color?: string | null;
+  pinned?: boolean;
   cards: CardItem[];
 }
 
@@ -90,6 +93,68 @@ interface BoardData {
   members: { role: string; user: { id: string; name: string | null; email: string } }[];
   columns: ColumnItem[];
 }
+
+const COLUMN_COLORS: Record<
+  string,
+  { name: string; border: string; bg: string; bar: string; text: string; dot: string }
+> = {
+  default: {
+    name: "Estándar",
+    border: "border-white/10",
+    bg: "bg-[rgba(18,11,36,0.65)]",
+    bar: "bg-[#7c3aed]",
+    text: "text-white",
+    dot: "bg-[#7c3aed]",
+  },
+  violet: {
+    name: "Violeta Neón",
+    border: "border-[#7c3aed]/50 shadow-lg shadow-[#7c3aed]/20",
+    bg: "bg-[rgba(30,17,58,0.85)]",
+    bar: "bg-gradient-to-r from-[#7c3aed] to-[#cebdff]",
+    text: "text-[#d2bbff]",
+    dot: "bg-[#7c3aed]",
+  },
+  emerald: {
+    name: "Verde Éxito",
+    border: "border-emerald-500/40 shadow-lg shadow-emerald-500/15",
+    bg: "bg-[rgba(6,32,23,0.85)]",
+    bar: "bg-gradient-to-r from-emerald-500 to-teal-400",
+    text: "text-emerald-300",
+    dot: "bg-emerald-500",
+  },
+  amber: {
+    name: "Ámbar Alerta",
+    border: "border-amber-500/40 shadow-lg shadow-amber-500/15",
+    bg: "bg-[rgba(36,22,6,0.85)]",
+    bar: "bg-gradient-to-r from-amber-500 to-yellow-400",
+    text: "text-amber-300",
+    dot: "bg-amber-500",
+  },
+  rose: {
+    name: "Rosa Urgente",
+    border: "border-rose-500/40 shadow-lg shadow-rose-500/15",
+    bg: "bg-[rgba(36,7,17,0.85)]",
+    bar: "bg-gradient-to-r from-rose-500 to-pink-400",
+    text: "text-rose-300",
+    dot: "bg-rose-500",
+  },
+  cyan: {
+    name: "Cian Técnico",
+    border: "border-cyan-500/40 shadow-lg shadow-cyan-500/15",
+    bg: "bg-[rgba(6,28,36,0.85)]",
+    bar: "bg-gradient-to-r from-cyan-500 to-blue-400",
+    text: "text-cyan-300",
+    dot: "bg-cyan-500",
+  },
+  blue: {
+    name: "Azul Enfoque",
+    border: "border-blue-500/40 shadow-lg shadow-blue-500/15",
+    bg: "bg-[rgba(10,22,46,0.85)]",
+    bar: "bg-gradient-to-r from-blue-500 to-indigo-400",
+    text: "text-blue-300",
+    dot: "bg-blue-500",
+  },
+};
 
 export default function BoardPage() {
   const params = useParams();
@@ -193,6 +258,7 @@ export default function BoardPage() {
   );
 
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -440,14 +506,91 @@ export default function BoardPage() {
     }
   }
 
+  // Column action handlers
+  async function handleTogglePinColumn(columnId: string) {
+    if (isReadOnly || !board) return;
+    const col = board.columns.find((c) => c.id === columnId);
+    if (!col) return;
+    const nextPinned = !col.pinned;
+
+    let updated = board.columns.map((c) => (c.id === columnId ? { ...c, pinned: nextPinned } : c));
+    updated.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    setBoard((prev) => (prev ? { ...prev, columns: updated } : prev));
+
+    try {
+      await fetch(`/api/boards/${boardId}/columns`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          columnId,
+          pinned: nextPinned,
+          reorder: updated.map((c, i) => ({ id: c.id, order: i, pinned: c.pinned, color: c.color })),
+        }),
+      });
+    } catch (err) {
+      console.error("Error al fijar columna:", err);
+    }
+  }
+
+  async function handleSetColumnColor(columnId: string, color: string) {
+    if (isReadOnly || !board) return;
+    const chosenColor = color === "default" ? null : color;
+
+    setBoard((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        columns: prev.columns.map((c) => (c.id === columnId ? { ...c, color: chosenColor } : c)),
+      };
+    });
+
+    try {
+      await fetch(`/api/boards/${boardId}/columns`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId, color: chosenColor }),
+      });
+    } catch (err) {
+      console.error("Error al cambiar color de columna:", err);
+    }
+  }
+
+  async function handleMoveColumn(columnId: string, direction: "left" | "right") {
+    if (isReadOnly || !board) return;
+    const currentIndex = board.columns.findIndex((c) => c.id === columnId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === "left" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= board.columns.length) return;
+
+    const reordered = arrayMove(board.columns, currentIndex, targetIndex);
+    setBoard((prev) => (prev ? { ...prev, columns: reordered } : prev));
+
+    try {
+      await fetch(`/api/boards/${boardId}/columns`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reorder: reordered.map((c, i) => ({ id: c.id, order: i, pinned: c.pinned, color: c.color })),
+        }),
+      });
+    } catch (err) {
+      console.error("Error al mover columna:", err);
+    }
+  }
+
   function findColumn(cols: ColumnItem[], id: string) {
     return cols.find((c) => c.id === id || c.cards.some((card) => card.id === id));
   }
 
-  // DnD Handlers
+  // Unified DnD Handlers (Columns and Cards)
   function handleDragStart(event: DragStartEvent) {
-    if (isReadOnly) return;
-    setActiveCardId(event.active.id as string);
+    if (isReadOnly || !board) return;
+    const activeId = event.active.id as string;
+    if (board.columns.some((c) => c.id === activeId)) {
+      setActiveColumnId(activeId);
+      return;
+    }
+    setActiveCardId(activeId);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -459,6 +602,21 @@ export default function BoardPage() {
     const overId = over.id as string;
     if (activeId === overId) return;
 
+    // If dragging a column over another column
+    if (board.columns.some((c) => c.id === activeId)) {
+      if (board.columns.some((c) => c.id === overId)) {
+        setBoard((prev) => {
+          if (!prev) return prev;
+          const oldIndex = prev.columns.findIndex((c) => c.id === activeId);
+          const newIndex = prev.columns.findIndex((c) => c.id === overId);
+          if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
+          return { ...prev, columns: arrayMove(prev.columns, oldIndex, newIndex) };
+        });
+      }
+      return;
+    }
+
+    // Dragging card over column / card
     const activeCol = findColumn(board.columns, activeId);
     const overCol = findColumn(board.columns, overId);
 
@@ -496,6 +654,8 @@ export default function BoardPage() {
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    const isColDrag = activeColumnId !== null;
+    setActiveColumnId(null);
     setActiveCardId(null);
     if (isReadOnly || !board) return;
 
@@ -505,6 +665,33 @@ export default function BoardPage() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
+    // Finalize column drag
+    if (isColDrag || board.columns.some((c) => c.id === activeId)) {
+      if (board.columns.some((c) => c.id === overId) && activeId !== overId) {
+        let updatedColumns = [...board.columns];
+        const oldIndex = updatedColumns.findIndex((c) => c.id === activeId);
+        const newIndex = updatedColumns.findIndex((c) => c.id === overId);
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          updatedColumns = arrayMove(updatedColumns, oldIndex, newIndex);
+        }
+        setBoard((prev) => (prev ? { ...prev, columns: updatedColumns } : prev));
+
+        try {
+          await fetch(`/api/boards/${boardId}/columns`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reorder: updatedColumns.map((c, i) => ({ id: c.id, order: i, pinned: c.pinned, color: c.color })),
+            }),
+          });
+        } catch (err) {
+          console.error("Error al persistir orden de columnas:", err);
+        }
+      }
+      return;
+    }
+
+    // Finalize card drag
     const activeCol = findColumn(board.columns, activeId);
     const overCol = findColumn(board.columns, overId);
 
@@ -591,6 +778,11 @@ export default function BoardPage() {
     return null;
   }, [activeCardId, board]);
 
+  const activeColumn = useMemo(() => {
+    if (!activeColumnId || !board) return null;
+    return board.columns.find((c) => c.id === activeColumnId) || null;
+  }, [activeColumnId, board]);
+
   if (loading || status === "loading") {
     return (
       <div className="min-h-screen bg-[#161121] flex items-center justify-center">
@@ -663,7 +855,7 @@ export default function BoardPage() {
               </span>
             </div>
             <p className="text-xs text-[#958da1] mt-0.5">
-              Propietario: {board.owner?.name || board.owner?.email} • Sincronización SQLite continua
+              Propietario: {board.owner?.name || board.owner?.email}
             </p>
             {board.description && (
               <p className="text-xs text-[#ccc3d8] mt-1 max-w-xl">
@@ -920,38 +1112,48 @@ export default function BoardPage() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 sm:p-8 flex gap-6 items-start">
-          {board.columns.map((column, idx) => {
-            const columnCards = column.cards.filter((c) => {
-              const matchesTag = selectedTag
-                ? c.tags?.some((t) => t.name === selectedTag)
-                : true;
-              const matchesSearch = searchFilter
-                ? c.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                  c.tags?.some((t) => t.name.toLowerCase().includes(searchFilter.toLowerCase()))
-                : true;
-              return matchesTag && matchesSearch;
-            });
+          <SortableContext
+            items={board.columns.map((c) => c.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {board.columns.map((column, idx) => {
+              const columnCards = column.cards.filter((c) => {
+                const matchesTag = selectedTag
+                  ? c.tags?.some((t) => t.name === selectedTag)
+                  : true;
+                const matchesSearch = searchFilter
+                  ? c.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                    c.tags?.some((t) => t.name.toLowerCase().includes(searchFilter.toLowerCase()))
+                  : true;
+                return matchesTag && matchesSearch;
+              });
 
-            const emojiIcons = ["💡", "⚡", "🧪", "🚀", "✅", "📌", "🔥"];
-            const iconEmoji = emojiIcons[idx % emojiIcons.length];
+              const emojiIcons = ["💡", "⚡", "🧪", "🚀", "✅", "📌", "🔥"];
+              const iconEmoji = emojiIcons[idx % emojiIcons.length];
 
-            return (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                iconEmoji={iconEmoji}
-                cards={columnCards}
-                isReadOnly={isReadOnly}
-                onAddCard={(colId) => handleAddCard(colId)}
-                onDeleteColumn={handleDeleteColumn}
-                cardTitleInput={newCardTitles[column.id] || ""}
-                setCardTitleInput={(val) =>
-                  setNewCardTitles((prev) => ({ ...prev, [column.id]: val }))
-                }
-                onCardClick={(card) => setSelectedCard(card)}
-              />
-            );
-          })}
+              return (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  iconEmoji={iconEmoji}
+                  cards={columnCards}
+                  isReadOnly={isReadOnly}
+                  onAddCard={(colId) => handleAddCard(colId)}
+                  onDeleteColumn={handleDeleteColumn}
+                  cardTitleInput={newCardTitles[column.id] || ""}
+                  setCardTitleInput={(val) =>
+                    setNewCardTitles((prev) => ({ ...prev, [column.id]: val }))
+                  }
+                  onCardClick={(card) => setSelectedCard(card)}
+                  onTogglePin={handleTogglePinColumn}
+                  onSetColor={handleSetColumnColor}
+                  onMoveColumn={handleMoveColumn}
+                  isFirst={idx === 0}
+                  isLast={idx === board.columns.length - 1}
+                />
+              );
+            })}
+          </SortableContext>
 
           {/* Inline Add Column Form */}
           {!isReadOnly && (
@@ -1002,7 +1204,11 @@ export default function BoardPage() {
         </div>
 
         <DragOverlay>
-          {activeCard ? <CardOverlay card={activeCard} /> : null}
+          {activeCard ? (
+            <CardOverlay card={activeCard} />
+          ) : activeColumn ? (
+            <ColumnOverlay column={activeColumn} />
+          ) : null}
         </DragOverlay>
       </DndContext>
 
@@ -1386,6 +1592,11 @@ function KanbanColumn({
   cardTitleInput,
   setCardTitleInput,
   onCardClick,
+  onTogglePin,
+  onSetColor,
+  onMoveColumn,
+  isFirst,
+  isLast,
 }: {
   column: ColumnItem;
   iconEmoji: string;
@@ -1396,37 +1607,155 @@ function KanbanColumn({
   cardTitleInput: string;
   setCardTitleInput: (val: string) => void;
   onCardClick: (card: CardItem) => void;
+  onTogglePin: (colId: string) => void;
+  onSetColor: (colId: string, color: string) => void;
+  onMoveColumn: (colId: string, direction: "left" | "right") => void;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
-  const { setNodeRef } = useDroppable({
+  const [showColorPalette, setShowColorPalette] = useState(false);
+  const colorTheme = COLUMN_COLORS[column.color || "default"] || COLUMN_COLORS.default;
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: column.id,
+    disabled: isReadOnly,
+    data: {
+      type: "column",
+    },
   });
+
+  const style = {
+    transition,
+    transform: CSS.Translate.toString(transform),
+  };
 
   const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
 
   return (
     <div
       ref={setNodeRef}
-      className="w-[316px] shrink-0 max-h-full flex flex-col rounded-2xl bg-[rgba(18,11,36,0.65)] backdrop-blur-[24px] border border-white/5 shadow-xl shadow-[#100b1c]/50"
+      style={style}
+      className={`w-[316px] shrink-0 max-h-full flex flex-col rounded-2xl backdrop-blur-[24px] border ${
+        colorTheme.border
+      } ${colorTheme.bg} shadow-xl shadow-[#100b1c]/50 transition-all ${
+        isDragging ? "opacity-30 scale-95 ring-2 ring-[#7c3aed]" : ""
+      }`}
     >
+      {/* Accent colored top bar */}
+      <div className={`h-1.5 w-full rounded-t-2xl ${colorTheme.bar}`} />
+
       {/* Column Header */}
-      <div className="sticky top-0 z-10 px-4 py-3.5 border-b border-[#4a4455]/20 flex items-center justify-between backdrop-blur-xl rounded-t-2xl">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{iconEmoji}</span>
-          <h3 className="text-sm font-bold text-white tracking-tight">{column.title}</h3>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739] text-[#ccc3d8]">
+      <div className="sticky top-0 z-10 px-3.5 py-3 border-b border-[#4a4455]/20 flex items-center justify-between backdrop-blur-xl">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Drag handle for column reordering */}
+          {!isReadOnly && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/10 text-[#958da1] hover:text-white transition-colors"
+              title="Arrastrar para mover columna"
+            >
+              <span className="material-symbols-outlined text-sm leading-none">drag_indicator</span>
+            </div>
+          )}
+
+          <span className="text-base shrink-0">{column.pinned ? "📌" : iconEmoji}</span>
+          <h3 className={`text-sm font-bold truncate tracking-tight ${colorTheme.text}`}>
+            {column.title}
+          </h3>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739] text-[#ccc3d8] shrink-0">
             {cards.length}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* Column Actions: Pin, Color, Reorder, Delete */}
+        <div className="flex items-center gap-0.5 relative">
           {!isReadOnly && (
-            <button
-              onClick={() => onDeleteColumn(column.id)}
-              className="text-[#958da1] hover:text-red-400 p-1 rounded transition-colors"
-              title="Eliminar columna"
-            >
-              <IconTrash className="w-3.5 h-3.5" />
-            </button>
+            <>
+              {/* Quick Move Left */}
+              <button
+                type="button"
+                disabled={isFirst}
+                onClick={() => onMoveColumn(column.id, "left")}
+                className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5"
+                title="Mover a la izquierda"
+              >
+                <span className="text-[10px] font-bold">◀</span>
+              </button>
+
+              {/* Quick Move Right */}
+              <button
+                type="button"
+                disabled={isLast}
+                onClick={() => onMoveColumn(column.id, "right")}
+                className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5"
+                title="Mover a la derecha"
+              >
+                <span className="text-[10px] font-bold">▶</span>
+              </button>
+
+              {/* Pin Column Toggle */}
+              <button
+                type="button"
+                onClick={() => onTogglePin(column.id)}
+                className={`p-1 rounded transition-colors ${
+                  column.pinned
+                    ? "text-[#d2bbff] bg-[#7c3aed]/30 ring-1 ring-[#7c3aed]/50"
+                    : "text-[#958da1] hover:text-white hover:bg-white/5"
+                }`}
+                title={column.pinned ? "Desfijar columna" : "Fijar columna al inicio"}
+              >
+                <span className="text-xs leading-none">📌</span>
+              </button>
+
+              {/* Color Palette Picker */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowColorPalette((prev) => !prev)}
+                  className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/5 transition-colors"
+                  title="Cambiar color de columna"
+                >
+                  <span className="material-symbols-outlined text-xs leading-none">palette</span>
+                </button>
+
+                {showColorPalette && (
+                  <div className="absolute right-0 top-full mt-1.5 p-2 bg-[#1e192a] border border-[#7c3aed]/40 rounded-xl shadow-2xl z-30 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-100">
+                    {Object.entries(COLUMN_COLORS).map(([key, c]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          onSetColor(column.id, key);
+                          setShowColorPalette(false);
+                        }}
+                        className={`w-5 h-5 rounded-full ${c.dot} transition-transform hover:scale-125 border ${
+                          (column.color || "default") === key ? "ring-2 ring-white scale-110" : "border-white/20"
+                        }`}
+                        title={c.name}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Delete Column */}
+              <button
+                type="button"
+                onClick={() => onDeleteColumn(column.id)}
+                className="text-[#958da1] hover:text-red-400 p-1 rounded transition-colors"
+                title="Eliminar columna"
+              >
+                <IconTrash className="w-3.5 h-3.5" />
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1478,6 +1807,27 @@ function KanbanColumn({
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+// ----------------- Column Overlay (DnD Preview) -----------------
+function ColumnOverlay({ column }: { column: ColumnItem }) {
+  const colorTheme = COLUMN_COLORS[column.color || "default"] || COLUMN_COLORS.default;
+  return (
+    <div
+      className={`w-[316px] rounded-2xl border-2 border-[#7c3aed] shadow-2xl p-4 ${colorTheme.bg} backdrop-blur-xl rotate-1 scale-105 opacity-90`}
+    >
+      <div className={`h-1.5 w-full rounded-t-xl mb-3 ${colorTheme.bar}`} />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">{column.pinned ? "📌" : "📋"}</span>
+          <h3 className={`text-sm font-bold ${colorTheme.text}`}>{column.title}</h3>
+        </div>
+        <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#2d2739] text-[#ccc3d8]">
+          {column.cards?.length || 0}
+        </span>
+      </div>
     </div>
   );
 }

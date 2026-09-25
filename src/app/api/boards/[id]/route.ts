@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         },
       },
       columns: {
-        orderBy: { order: "asc" },
+        orderBy: [{ pinned: "desc" }, { order: "asc" }],
         include: {
           cards: {
             where: { archived: false },

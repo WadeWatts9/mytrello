@@ -50,10 +50,30 @@ export async function GET() {
         },
       },
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ order: "asc" }, { updatedAt: "desc" }],
   });
 
   return NextResponse.json(boards);
+}
+
+export async function PATCH(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  if (Array.isArray(body.reorder)) {
+    await prisma.$transaction(
+      body.reorder.map((item: any, idx: number) =>
+        prisma.board.update({
+          where: { id: item.id },
+          data: { order: item.order !== undefined ? item.order : idx },
+        })
+      )
+    );
+    return NextResponse.json({ success: true });
+  }
+
+  return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 }
 
 export async function POST(req: Request) {

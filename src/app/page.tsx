@@ -15,6 +15,7 @@ import {
   IconShare,
   IconEdit,
 } from "@/components/Icons";
+import { arrayMove } from "@dnd-kit/sortable";
 
 interface BoardItem {
   id: string;
@@ -210,6 +211,31 @@ export default function HomePage() {
       console.error(err);
     } finally {
       setUploadingEditCover(false);
+    }
+  }
+
+  async function handleMoveBoard(e: React.MouseEvent, boardId: string, direction: "left" | "right") {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const currentIndex = boards.findIndex((b) => b.id === boardId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === "left" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= boards.length) return;
+
+    const reordered = arrayMove(boards, currentIndex, targetIndex);
+    setBoards(reordered);
+
+    try {
+      await fetch("/api/boards", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reorder: reordered.map((b, i) => ({ id: b.id, order: i })),
+        }),
+      });
+    } catch (err) {
+      console.error(err);
     }
   }
 
@@ -615,27 +641,29 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Bottom SQLite Info Widget (Stitch Component) */}
-          <div className="space-y-3 pt-4 border-t border-[#4a4455]/20">
-            <div className="p-2.5 rounded-xl bg-[#100b1c]/80 border border-[#4a4455]/30 flex flex-col gap-1.5 shadow-inner">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono text-[#d2bbff] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">database</span>
-                  <span>SQLite Driver</span>
-                </span>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                  SYNCED
-                </span>
-              </div>
-              <div className="w-full bg-[#2d2739] rounded-full h-1.5 overflow-hidden">
-                <div className="bg-[#7c3aed] h-full rounded-full w-4/5" />
-              </div>
-              <div className="flex justify-between text-[10px] font-mono text-[#958da1]">
-                <span>dev.db (:3004)</span>
-                <span>ZimaOS Persistent</span>
+          {/* Bottom SQLite Info Widget (Admin Only) */}
+          {isAdmin && (
+            <div className="space-y-3 pt-4 border-t border-[#4a4455]/20">
+              <div className="p-2.5 rounded-xl bg-[#100b1c]/80 border border-[#4a4455]/30 flex flex-col gap-1.5 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-[#d2bbff] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">database</span>
+                    <span>SQLite Driver</span>
+                  </span>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    SYNCED
+                  </span>
+                </div>
+                <div className="w-full bg-[#2d2739] rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-[#7c3aed] h-full rounded-full w-4/5" />
+                </div>
+                <div className="flex justify-between text-[10px] font-mono text-[#958da1]">
+                  <span>dev.db (:3004)</span>
+                  <span>ZimaOS Persistent</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </aside>
 
         {/* Main Content Area */}
@@ -732,7 +760,25 @@ export default function HomePage() {
                           {isOwner ? "#Personal" : "#Compartido"}
                         </span>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
+                          {/* Reorder Board */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleMoveBoard(e, board.id, "left")}
+                            className="p-1 text-[#958da1] hover:text-white hover:bg-white/5 rounded transition-colors"
+                            title="Mover tablero a la izquierda"
+                          >
+                            <span className="material-symbols-outlined text-sm">chevron_left</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleMoveBoard(e, board.id, "right")}
+                            className="p-1 text-[#958da1] hover:text-white hover:bg-white/5 rounded transition-colors"
+                            title="Mover tablero a la derecha"
+                          >
+                            <span className="material-symbols-outlined text-sm">chevron_right</span>
+                          </button>
+
                           <button
                             onClick={(e) => toggleFavorite(e, board.id)}
                             className="p-1 text-[#958da1] hover:text-amber-400 transition-colors"

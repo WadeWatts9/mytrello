@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(newColumn, { status: 201 });
 }
 
-// PATCH /api/boards/[id]/columns - Update column (rename or reorder)
+// PATCH /api/boards/[id]/columns - Update column (rename, reorder, color, pinned, or bulk reorder)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -64,11 +64,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const canEdit = await verifyBoardEditor(boardId, userId, userRole);
   if (!canEdit) return NextResponse.json({ error: "Editor permission required" }, { status: 403 });
 
-  const { columnId, title, order } = await req.json();
+  const body = await req.json();
+
+  // Bulk reorder support
+  if (Array.isArray(body.reorder)) {
+    await prisma.$transaction(
+      body.reorder.map((item: any, idx: number) =>
+        prisma.column.update({
+          where: { id: item.id },
+          data: {
+            order: item.order !== undefined ? item.order : idx,
+            ...(item.pinned !== undefined ? { pinned: Boolean(item.pinned) } : {}),
+            ...(item.color !== undefined ? { color: item.color || null } : {}),
+          },
+        })
+      )
+    );
+    return NextResponse.json({ success: true });
+  }
+
+  const { columnId, title, order, color, pinned } = body;
 
   const updateData: any = {};
   if (title !== undefined) updateData.title = title.trim();
   if (order !== undefined) updateData.order = order;
+  if (color !== undefined) updateData.color = color || null;
+  if (pinned !== undefined) updateData.pinned = Boolean(pinned);
 
   const updated = await prisma.column.update({
     where: { id: columnId },

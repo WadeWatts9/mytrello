@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "My Trello | AetherKanban",
-  description: "AetherKanban — Atmospheric Violet Prism Kanban Workspace",
+  title: "My Trello",
+  description: "My Trello — Espacio de trabajo Kanban colaborativo y moderno",
   icons: {
     icon: "/favicon.png",
     apple: "/icon-192.png",

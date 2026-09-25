@@ -27,6 +27,7 @@ model Board {
   description String?
   coverImage  String?
   archived    Boolean       @default(false)
+  order       Int           @default(0)
   ownerId     String
   owner       User          @relation("OwnedBoards", fields: [ownerId], references: [id], onDelete: Cascade)
   members     BoardMember[]
@@ -51,6 +52,8 @@ model Column {
   id        String   @id @default(cuid())
   title     String
   order     Int      @default(0)
+  color     String?
+  pinned    Boolean  @default(false)
   boardId   String
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards     Card[]
