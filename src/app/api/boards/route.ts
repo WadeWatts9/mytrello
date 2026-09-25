@@ -41,6 +41,12 @@ export async function GET() {
         select: {
           id: true,
           _count: { select: { cards: true } },
+          cards: {
+            where: { archived: false },
+            select: {
+              tags: { select: { id: true, name: true } },
+            },
+          },
         },
       },
     },

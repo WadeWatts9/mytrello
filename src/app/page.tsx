@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -13,6 +13,7 @@ import {
   IconTrash,
   IconX,
   IconShare,
+  IconEdit,
 } from "@/components/Icons";
 
 interface BoardItem {
@@ -24,7 +25,11 @@ interface BoardItem {
   ownerId: string;
   owner: { id: string; name: string | null; email: string };
   members: { role: string; user: { id: string; name: string | null; email: string } }[];
-  columns: { id: string; _count: { cards: number } }[];
+  columns: {
+    id: string;
+    _count: { cards: number };
+    cards?: { tags?: { id: string; name: string }[] }[];
+  }[];
   updatedAt: string;
 }
 
@@ -46,8 +51,167 @@ export default function HomePage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Edit board modal
+  const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
+  const [editBoardTitle, setEditBoardTitle] = useState("");
+  const [editBoardDesc, setEditBoardDesc] = useState("");
+  const [editBoardCover, setEditBoardCover] = useState("");
+  const [uploadingEditCover, setUploadingEditCover] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editBoardError, setEditBoardError] = useState("");
+
   const currentUser = session?.user as any;
   const isAdmin = currentUser?.role === "ADMIN";
+
+  // Tag frequency across all boards (cards and titles/descriptions)
+  const tagFrequency = useMemo(() => {
+    const counts: Record<string, number> = {};
+    boards.forEach((b) => {
+      b.columns?.forEach((col) => {
+        col.cards?.forEach((c) => {
+          c.tags?.forEach((t) => {
+            counts[t.name] = (counts[t.name] || 0) + 1;
+          });
+        });
+      });
+      const text = `${b.title} ${b.description || ""}`;
+      const matches = text.match(/#[\w-]+/g);
+      matches?.forEach((m) => {
+        const clean = m.replace(/^#/, "");
+        counts[clean] = (counts[clean] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [boards]);
+
+  // Sidebar Quick Filters state
+  const [quickFilters, setQuickFilters] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [newQuickFilterInput, setNewQuickFilterInput] = useState("");
+  const [isAddingQuickFilter, setIsAddingQuickFilter] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("mytrello_dashboard_filters");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setQuickFilters(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    if (tagFrequency.length > 0) {
+      setQuickFilters(tagFrequency.slice(0, 6).map((t) => t.name));
+    } else {
+      setQuickFilters(["Frontend", "Sprint24", "Personal"]);
+    }
+  }, [tagFrequency]);
+
+  const saveQuickFilters = (filters: string[]) => {
+    setQuickFilters(filters);
+    try {
+      localStorage.setItem("mytrello_dashboard_filters", JSON.stringify(filters));
+    } catch (e) {}
+  };
+
+  const handleRemoveQuickFilter = (tagToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = quickFilters.filter((t) => t.toLowerCase() !== tagToRemove.toLowerCase());
+    saveQuickFilters(next);
+    if (selectedTag?.toLowerCase() === tagToRemove.toLowerCase()) {
+      setSelectedTag(null);
+    }
+  };
+
+  const handleAddQuickFilter = (tagToAdd: string) => {
+    const clean = tagToAdd.replace(/^#/, "").trim();
+    if (!clean) return;
+    if (!quickFilters.some((t) => t.toLowerCase() === clean.toLowerCase())) {
+      const next = [...quickFilters, clean];
+      saveQuickFilters(next);
+    }
+    setNewQuickFilterInput("");
+    setIsAddingQuickFilter(false);
+  };
+
+  const suggestedTags = useMemo(() => {
+    return tagFrequency
+      .filter((t) => !quickFilters.some((q) => q.toLowerCase() === t.name.toLowerCase()))
+      .slice(0, 5);
+  }, [tagFrequency, quickFilters]);
+
+  function openEditModal(e: React.MouseEvent, board: BoardItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingBoard(board);
+    setEditBoardTitle(board.title);
+    setEditBoardDesc(board.description || "");
+    setEditBoardCover(board.coverImage || "");
+    setEditBoardError("");
+  }
+
+  async function handleSaveBoardEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingBoard || !editBoardTitle.trim()) return;
+
+    setSavingEdit(true);
+    setEditBoardError("");
+    try {
+      const res = await fetch(`/api/boards/${editingBoard.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editBoardTitle.trim(),
+          description: editBoardDesc.trim() || null,
+          coverImage: editBoardCover.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al actualizar tablero");
+      }
+
+      const updated = await res.json();
+      setBoards((prev) =>
+        prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b))
+      );
+      setEditingBoard(null);
+    } catch (err: any) {
+      setEditBoardError(err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleUploadEditCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingEditCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setEditBoardCover(data.url);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingEditCover(false);
+    }
+  }
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -174,9 +338,39 @@ export default function HomePage() {
       ? favBoards
       : boards;
 
-  const filteredBoards = currentTabList.filter((b) =>
-    b.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredBoards = currentTabList.filter((b) => {
+    const matchesSearch = search
+      ? b.title.toLowerCase().includes(search.toLowerCase()) ||
+        b.description?.toLowerCase().includes(search.toLowerCase())
+      : true;
+
+    if (!selectedTag) return matchesSearch;
+
+    const tagLower = selectedTag.toLowerCase();
+    const isOwner = b.ownerId === currentUser?.id;
+
+    if (tagLower === "personal") {
+      if (isOwner) return matchesSearch;
+    }
+    if (tagLower === "compartido") {
+      if (!isOwner) return matchesSearch;
+    }
+
+    if (
+      b.title.toLowerCase().includes(tagLower) ||
+      b.description?.toLowerCase().includes(tagLower)
+    ) {
+      return matchesSearch;
+    }
+
+    const hasTagInCards = b.columns?.some((col) =>
+      col.cards?.some((c) =>
+        c.tags?.some((t) => t.name.toLowerCase() === tagLower)
+      )
+    );
+
+    return hasTagInCards && matchesSearch;
+  });
 
   if (loading || status === "loading") {
     return (
@@ -288,39 +482,136 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Quick Tags Filter (from Stitch Design) */}
-            <div className="space-y-2 pt-2 border-t border-[#4a4455]/20">
-              <span className="text-[10px] uppercase font-bold text-[#958da1] tracking-wider px-3 block">
-                Filtros Rápidos
-              </span>
-              <div className="flex flex-wrap gap-1.5 px-2">
-                <button
-                  onClick={() => setSearch("#Frontend")}
-                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#7c3aed]/20 text-[#cebdff] border border-[#7c3aed]/30 hover:bg-[#7c3aed]/30 transition-colors"
-                >
-                  #Frontend
-                </button>
-                <button
-                  onClick={() => setSearch("#Sprint24")}
-                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#ae397b]/25 text-[#ffafd3] border border-[#ae397b]/30 hover:bg-[#ae397b]/35 transition-colors"
-                >
-                  #Sprint24
-                </button>
-                <button
-                  onClick={() => setSearch("#Personal")}
-                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#2d2739] text-[#ccc3d8] border border-[#4a4455]/30 hover:text-white transition-colors"
-                >
-                  #Personal
-                </button>
-                {search && (
+            {/* Quick Tags Filter (Editable & Dynamic) */}
+            <div className="space-y-2.5 pt-3 border-t border-[#4a4455]/20">
+              <div className="flex items-center justify-between px-3">
+                <span className="text-[10px] uppercase font-bold text-[#958da1] tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-xs text-[#d2bbff]">filter_list</span>
+                  <span>Filtros Rápidos</span>
+                </span>
+                {selectedTag && (
                   <button
-                    onClick={() => setSearch("")}
-                    className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-500/20 text-red-300 border border-red-500/30"
+                    onClick={() => setSelectedTag(null)}
+                    className="text-[10px] text-red-300 hover:text-red-200 font-bold cursor-pointer"
+                    title="Mostrar todos los tableros"
                   >
-                    Limpiar ✕
+                    ✕ Ver todos
                   </button>
                 )}
               </div>
+
+              {/* Tag Chips */}
+              <div className="flex flex-wrap gap-1.5 px-2">
+                {quickFilters.map((tag) => {
+                  const isSelected = selectedTag?.toLowerCase() === tag.toLowerCase();
+                  const count = tagFrequency.find((t) => t.name.toLowerCase() === tag.toLowerCase())?.count || 0;
+                  return (
+                    <div
+                      key={tag}
+                      onClick={() => setSelectedTag(isSelected ? null : tag)}
+                      className={`group flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? "bg-[#7c3aed] text-white shadow-sm ring-1 ring-[#cebdff]/40"
+                          : "bg-[#7c3aed]/15 text-[#d2bbff] border border-[#7c3aed]/30 hover:bg-[#7c3aed]/25"
+                      }`}
+                      title={`Filtrar tableros por #${tag} (${count} tarjetas)`}
+                    >
+                      <span>#{tag}</span>
+                      {count > 0 && (
+                        <span
+                          className={`text-[9px] px-1 rounded-full font-bold ${
+                            isSelected ? "bg-white/20 text-white" : "bg-[#7c3aed]/30 text-[#e9def6]"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveQuickFilter(tag, e)}
+                        className="opacity-50 hover:opacity-100 hover:text-red-300 ml-0.5 p-0.5 rounded transition-opacity"
+                        title="Eliminar de filtros rápidos"
+                      >
+                        <IconX className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* Add new filter button or input */}
+                {isAddingQuickFilter ? (
+                  <div className="flex items-center gap-1 bg-[#100b1c] border border-[#7c3aed]/50 rounded-lg px-2 py-0.5 animate-in fade-in zoom-in-95 duration-100">
+                    <span className="text-[#958da1] text-xs">#</span>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="nuevo-filtro"
+                      value={newQuickFilterInput}
+                      onChange={(e) => setNewQuickFilterInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddQuickFilter(newQuickFilterInput);
+                        } else if (e.key === "Escape") {
+                          setIsAddingQuickFilter(false);
+                          setNewQuickFilterInput("");
+                        }
+                      }}
+                      className="bg-transparent text-xs text-white focus:outline-none w-20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuickFilter(newQuickFilterInput)}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 font-bold px-0.5"
+                      title="Añadir"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingQuickFilter(false);
+                        setNewQuickFilterInput("");
+                      }}
+                      className="text-xs text-[#958da1] hover:text-white px-0.5"
+                      title="Cancelar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingQuickFilter(true)}
+                    className="px-2 py-0.5 rounded-lg text-[10px] font-semibold text-[#ccc3d8] hover:text-white bg-white/5 hover:bg-white/10 border border-dashed border-[#4a4455]/40 hover:border-[#7c3aed] flex items-center gap-1 transition-all cursor-pointer"
+                    title="Añadir un nuevo filtro rápido a la barra lateral"
+                  >
+                    <IconPlus className="w-2.5 h-2.5 text-[#d2bbff]" />
+                    <span>Añadir</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Suggested Most Used Hashtags in Sidebar */}
+              {suggestedTags.length > 0 && (
+                <div className="px-2 pt-1 space-y-1">
+                  <span className="text-[9px] uppercase font-semibold text-[#958da1] block">
+                    Más usadas:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestedTags.map((st) => (
+                      <button
+                        key={st.name}
+                        onClick={() => handleAddQuickFilter(st.name)}
+                        className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-[#ccc3d8] hover:text-white hover:bg-[#7c3aed]/25 border border-white/10 flex items-center gap-1 transition-all cursor-pointer"
+                        title={`Añadir #${st.name} a los filtros rápidos (${st.count} tarjetas)`}
+                      >
+                        <span>+{st.name}</span>
+                        <span className="text-[9px] text-[#958da1]">({st.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -455,6 +746,16 @@ export default function HomePage() {
                               star
                             </span>
                           </button>
+
+                          {canDelete && (
+                            <button
+                              onClick={(e) => openEditModal(e, board)}
+                              className="p-1 text-[#958da1] hover:text-[#d2bbff] transition-colors"
+                              title="Editar tablero"
+                            >
+                              <IconEdit className="w-4 h-4" />
+                            </button>
+                          )}
 
                           {canDelete && (
                             <button
@@ -667,6 +968,126 @@ export default function HomePage() {
                   className="primary-btn px-5 py-2 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50"
                 >
                   {creating ? "Creando..." : "Crear Tablero"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Tablero */}
+      {editingBoard && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-modal max-w-md w-full p-6 space-y-4 rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#d2bbff]">edit</span>
+                <span>Editar Tablero</span>
+              </h3>
+              <button
+                onClick={() => setEditingBoard(null)}
+                className="text-[#958da1] hover:text-white"
+              >
+                <IconX className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editBoardError && (
+              <div className="p-3 text-xs rounded-xl bg-red-500/15 border border-red-500/30 text-red-200">
+                {editBoardError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveBoardEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#ccc3d8] mb-1">
+                  Nombre del Tablero *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Sprint 25, Proyecto Alpha..."
+                  value={editBoardTitle}
+                  onChange={(e) => setEditBoardTitle(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#ccc3d8] mb-1">
+                  Descripción (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Breve propósito o alcance del tablero..."
+                  value={editBoardDesc}
+                  onChange={(e) => setEditBoardDesc(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2 rounded-xl text-xs resize-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#ccc3d8]">
+                    Imagen de Portada (Opcional)
+                  </label>
+                  {editBoardCover && (
+                    <button
+                      type="button"
+                      onClick={() => setEditBoardCover("")}
+                      className="text-[11px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                    >
+                      Quitar portada
+                    </button>
+                  )}
+                </div>
+
+                {editBoardCover && (
+                  <div className="relative w-full h-24 rounded-xl overflow-hidden mb-2 border border-white/10">
+                    <img
+                      src={editBoardCover}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="URL: https://..."
+                    value={editBoardCover}
+                    onChange={(e) => setEditBoardCover(e.target.value)}
+                    className="glass-input flex-1 px-3 py-1.5 rounded-xl text-xs"
+                  />
+                  <label className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer shrink-0">
+                    <span className="material-symbols-outlined text-sm text-[#d2bbff]">upload</span>
+                    <span>{uploadingEditCover ? "Subiendo..." : "Subir archivo"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadEditCover}
+                      className="hidden"
+                      disabled={uploadingEditCover}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingBoard(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#ccc3d8] hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit || !editBoardTitle.trim()}
+                  className="primary-btn px-5 py-2 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50"
+                >
+                  {savingEdit ? "Guardando..." : "Guardar Cambios"}
                 </button>
               </div>
             </form>

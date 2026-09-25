@@ -17,6 +17,7 @@ import {
   IconX,
   IconUpload,
   IconExternalLink,
+  IconEdit,
 } from "@/components/Icons";
 
 import {
@@ -293,6 +294,72 @@ export default function BoardPage() {
     return tagFrequency.filter((t) => !quickFilters.includes(t.name)).slice(0, 6);
   }, [tagFrequency, quickFilters]);
 
+  // Edit Board Modal state & handlers
+  const [showEditBoardModal, setShowEditBoardModal] = useState(false);
+  const [editBoardTitle, setEditBoardTitle] = useState("");
+  const [editBoardDesc, setEditBoardDesc] = useState("");
+  const [editBoardCover, setEditBoardCover] = useState("");
+  const [uploadingBoardCover, setUploadingBoardCover] = useState(false);
+  const [savingBoardEdit, setSavingBoardEdit] = useState(false);
+  const [editBoardError, setEditBoardError] = useState("");
+
+  async function handleSaveBoardEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editBoardTitle.trim() || isReadOnly) return;
+
+    setSavingBoardEdit(true);
+    setEditBoardError("");
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editBoardTitle.trim(),
+          description: editBoardDesc.trim() || null,
+          coverImage: editBoardCover.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al actualizar tablero");
+      }
+
+      const updated = await res.json();
+      setBoard((prev) => (prev ? { ...prev, ...updated } : prev));
+      setShowEditBoardModal(false);
+    } catch (err: any) {
+      setEditBoardError(err.message);
+    } finally {
+      setSavingBoardEdit(false);
+    }
+  }
+
+  async function handleUploadBoardCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingBoardCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setEditBoardCover(data.url);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingBoardCover(false);
+    }
+  }
+
   // Handle adding card
   async function handleAddCard(columnId: string, customTitle?: string) {
     const title = (customTitle || newCardTitles[columnId])?.trim();
@@ -548,6 +615,18 @@ export default function BoardPage() {
         searchValue={searchFilter}
       />
 
+      {/* Optional Board Cover Image Banner */}
+      {board.coverImage && (
+        <div className="relative w-full h-32 sm:h-44 overflow-hidden shrink-0 border-b border-[#4a4455]/20">
+          <img
+            src={board.coverImage}
+            alt={board.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#161121] via-black/40 to-transparent" />
+        </div>
+      )}
+
       {/* Board Header Toolbar (from Stitch Design) */}
       <div className="px-6 sm:px-8 py-4 border-b border-[#4a4455]/20 bg-[#100b1c]/60 backdrop-blur-xl flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-4">
@@ -564,6 +643,21 @@ export default function BoardPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                 {board.title}
               </h1>
+              {!isReadOnly && (
+                <button
+                  onClick={() => {
+                    setEditBoardTitle(board.title);
+                    setEditBoardDesc(board.description || "");
+                    setEditBoardCover(board.coverImage || "");
+                    setEditBoardError("");
+                    setShowEditBoardModal(true);
+                  }}
+                  className="p-1 rounded-lg text-[#958da1] hover:text-[#d2bbff] hover:bg-white/5 transition-colors"
+                  title="Editar nombre, descripción y portada del tablero"
+                >
+                  <IconEdit className="w-4 h-4" />
+                </button>
+              )}
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/40">
                 {isReadOnly ? "Modo Lector" : "En Progreso"}
               </span>
@@ -571,6 +665,11 @@ export default function BoardPage() {
             <p className="text-xs text-[#958da1] mt-0.5">
               Propietario: {board.owner?.name || board.owner?.email} • Sincronización SQLite continua
             </p>
+            {board.description && (
+              <p className="text-xs text-[#ccc3d8] mt-1 max-w-xl">
+                {board.description}
+              </p>
+            )}
           </div>
         </div>
 
@@ -630,6 +729,24 @@ export default function BoardPage() {
             >
               <span className="material-symbols-outlined text-sm text-[#d2bbff]">manage_accounts</span>
               <span>👤 Gestionar Miembros ({board.members?.length || 0})</span>
+            </button>
+          )}
+
+          {/* Edit Board Settings Button */}
+          {!isReadOnly && (
+            <button
+              onClick={() => {
+                setEditBoardTitle(board.title);
+                setEditBoardDesc(board.description || "");
+                setEditBoardCover(board.coverImage || "");
+                setEditBoardError("");
+                setShowEditBoardModal(true);
+              }}
+              className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white cursor-pointer"
+              title="Editar título, descripción y portada del tablero"
+            >
+              <IconEdit className="w-3.5 h-3.5 text-[#d2bbff]" />
+              <span>⚙️ Ajustes Tablero</span>
             </button>
           )}
 
@@ -1128,6 +1245,126 @@ export default function BoardPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Tablero */}
+      {showEditBoardModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-modal max-w-md w-full p-6 space-y-4 rounded-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#d2bbff]">edit</span>
+                <span>Editar Tablero</span>
+              </h3>
+              <button
+                onClick={() => setShowEditBoardModal(false)}
+                className="text-[#958da1] hover:text-white"
+              >
+                <IconX className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editBoardError && (
+              <div className="p-3 text-xs rounded-xl bg-red-500/15 border border-red-500/30 text-red-200">
+                {editBoardError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveBoardEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#ccc3d8] mb-1">
+                  Nombre del Tablero *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Sprint 25, Proyecto Alpha..."
+                  value={editBoardTitle}
+                  onChange={(e) => setEditBoardTitle(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2.5 rounded-xl text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#ccc3d8] mb-1">
+                  Descripción (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Breve propósito o alcance del tablero..."
+                  value={editBoardDesc}
+                  onChange={(e) => setEditBoardDesc(e.target.value)}
+                  className="glass-input w-full px-3.5 py-2 rounded-xl text-xs resize-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-[#ccc3d8]">
+                    Imagen de Portada (Opcional)
+                  </label>
+                  {editBoardCover && (
+                    <button
+                      type="button"
+                      onClick={() => setEditBoardCover("")}
+                      className="text-[11px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                    >
+                      Quitar portada
+                    </button>
+                  )}
+                </div>
+
+                {editBoardCover && (
+                  <div className="relative w-full h-24 rounded-xl overflow-hidden mb-2 border border-white/10">
+                    <img
+                      src={editBoardCover}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="URL: https://..."
+                    value={editBoardCover}
+                    onChange={(e) => setEditBoardCover(e.target.value)}
+                    className="glass-input flex-1 px-3 py-1.5 rounded-xl text-xs"
+                  />
+                  <label className="secondary-glass-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer shrink-0">
+                    <span className="material-symbols-outlined text-sm text-[#d2bbff]">upload</span>
+                    <span>{uploadingBoardCover ? "Subiendo..." : "Subir archivo"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadBoardCover}
+                      className="hidden"
+                      disabled={uploadingBoardCover}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowEditBoardModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#ccc3d8] hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingBoardEdit || !editBoardTitle.trim()}
+                  className="primary-btn px-5 py-2 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50"
+                >
+                  {savingBoardEdit ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
