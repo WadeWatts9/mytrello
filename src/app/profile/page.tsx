@@ -107,7 +107,24 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || "Error al subir avatar");
 
       setAvatar(data.url);
-      setProfileMessage({ type: "success", text: "Imagen cargada. Pulsa en 'Guardar Cambios' para aplicarla a tu cuenta." });
+
+      // Auto-save uploaded avatar immediately
+      const saveRes = await fetch("/api/users/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() || profile?.name, avatar: data.url }),
+      });
+
+      if (saveRes.ok) {
+        const savedData = await saveRes.json();
+        setProfile((prev: any) => ({ ...prev, ...savedData }));
+        if (update) {
+          await update({ image: savedData.avatar, avatar: savedData.avatar });
+        }
+        setProfileMessage({ type: "success", text: "¡Foto de perfil subida y guardada exitosamente!" });
+      } else {
+        setProfileMessage({ type: "success", text: "Imagen cargada. Pulsa en 'Guardar Cambios' para aplicarla." });
+      }
     } catch (err: any) {
       setProfileMessage({ type: "error", text: err.message });
     } finally {
@@ -328,8 +345,8 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input
-                      type="url"
-                      placeholder="https://ejemplo.com/avatar.jpg"
+                      type="text"
+                      placeholder="https://ejemplo.com/avatar.jpg o /api/uploads/..."
                       value={avatar}
                       onChange={(e) => setAvatar(e.target.value)}
                       className="glass-input flex-1 px-3.5 py-2 rounded-xl text-xs"

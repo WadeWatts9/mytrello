@@ -198,14 +198,6 @@ export default function Navbar({
               </span>
             </Link>
 
-            <Link
-              href="/profile"
-              title="Mi Perfil"
-              className="hidden md:flex p-2 rounded-xl text-[#958da1] hover:text-[#d2bbff] hover:bg-white/5 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-lg">account_circle</span>
-            </Link>
-
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               title="Cerrar sesión"

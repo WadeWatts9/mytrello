@@ -62,7 +62,7 @@ export async function PATCH(req: Request) {
     }
 
     if (avatar !== undefined) {
-      updateData.avatar = avatar;
+      updateData.avatar = avatar && String(avatar).trim().length > 0 ? String(avatar).trim() : null;
     }
 
     if (newPassword) {
