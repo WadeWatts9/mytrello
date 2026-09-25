@@ -11,13 +11,15 @@ const MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request, { params }: { params: Promise<{ filename: string }> }) {
   const { filename } = await params;
 
   // Prevent directory traversal
   const safeFilename = path.basename(filename);
-  const uploadDir = process.env.DATA_DIR || (process.env.NODE_ENV === "production" ? "/app/data/uploads" : path.join(process.cwd(), "data", "uploads"));
-  const filePath = path.join(uploadDir, safeFilename);
+  const uploadDir = process.env.DATA_DIR || (process.env.NODE_ENV === "production" ? "/app/data/uploads" : path.join(/*turbopackIgnore: true*/ process.cwd(), "data", "uploads"));
+  const filePath = path.join(/*turbopackIgnore: true*/ uploadDir, safeFilename);
 
   try {
     const file = await fs.readFile(filePath);
