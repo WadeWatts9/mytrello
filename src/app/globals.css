@@ -204,3 +204,31 @@ html.light ::-webkit-scrollbar-thumb {
   background: rgba(124, 58, 237, 0.3);
 }
 
+/* Light mode overrides for Kanban Column headers, emoji picker and inputs */
+html.light .column-edit-input {
+  background: #ffffff !important;
+  color: #1e1533 !important;
+  border-color: #7c3aed !important;
+}
+html.light .column-header-title {
+  color: #1e1533 !important;
+}
+html.light .column-emoji-box {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(124, 58, 237, 0.25) !important;
+}
+html.light .column-emoji-box span {
+  color: #4c3f68 !important;
+}
+html.light .column-emoji-btn {
+  background: rgba(124, 58, 237, 0.08) !important;
+}
+html.light .column-emoji-btn:hover {
+  background: rgba(124, 58, 237, 0.25) !important;
+}
+html.light .column-toolbar-box {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(124, 58, 237, 0.15) !important;
+}
+
+

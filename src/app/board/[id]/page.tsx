@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -155,6 +155,21 @@ const COLUMN_COLORS: Record<
     dot: "bg-blue-500",
   },
 };
+
+const COLUMN_PRESET_EMOJIS = [
+  "📋", "💡", "⏳", "⚡", "🚀", "🧪", "🔍", "✅",
+  "📌", "🎯", "🔥", "🐛", "📦", "🎨", "📝", "💬",
+  "🛑", "🎉", "⭐", "🛠️",
+];
+
+function applyEmojiToTitle(currentTitle: string, emoji: string): string {
+  const emojiRegex = /^(\p{Extended_Pictographic}|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])+\s*/u;
+  const trimmed = currentTitle.trim();
+  if (emojiRegex.test(trimmed)) {
+    return trimmed.replace(emojiRegex, `${emoji} `);
+  }
+  return `${emoji} ${trimmed}`;
+}
 
 export default function BoardPage() {
   const params = useParams();
@@ -1200,13 +1215,32 @@ export default function BoardPage() {
                   onSubmit={handleAddColumn}
                   className="glass-panel p-4 rounded-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150"
                 >
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-semibold text-[#cbbddf] text-center">
+                      Elige un emoji para la nueva columna:
+                    </span>
+                    <div className="column-emoji-box flex flex-wrap items-center justify-center gap-1 bg-[#140c28]/95 p-1.5 rounded-xl border border-violet-500/20 max-h-24 overflow-y-auto">
+                      {COLUMN_PRESET_EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setNewColumnTitle((prev) => applyEmojiToTitle(prev, emoji))}
+                          className="column-emoji-btn w-7 h-7 text-sm flex items-center justify-center rounded-lg hover:bg-violet-600/40 hover:scale-125 transition-transform active:scale-95 cursor-pointer bg-white/5"
+                          title={`Seleccionar ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
                     type="text"
                     autoFocus
-                    placeholder="Título de la columna (ej. Pruebas)..."
+                    placeholder="Título de la columna (ej. 📋 Por Hacer)..."
                     value={newColumnTitle}
                     onChange={(e) => setNewColumnTitle(e.target.value)}
-                    className="glass-input w-full text-xs px-3 py-2 rounded-xl"
+                    className="column-edit-input w-full text-xs font-bold text-center px-3 py-2 rounded-xl border-2 border-[#7c3aed] bg-[#1e1435] text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 shadow-inner"
                   />
                   <div className="flex items-center justify-end gap-2">
                     <button
@@ -1215,13 +1249,13 @@ export default function BoardPage() {
                         setAddingColumn(false);
                         setNewColumnTitle("");
                       }}
-                      className="px-3 py-1.5 text-xs text-[#958da1] hover:text-white"
+                      className="px-3 py-1.5 text-xs font-semibold text-[#958da1] hover:text-white transition-colors cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="primary-btn px-4 py-1.5 text-xs font-bold text-white rounded-lg shadow-sm"
+                      className="primary-btn px-4 py-1.5 text-xs font-bold text-white rounded-lg shadow-sm cursor-pointer"
                     >
                       Guardar Columna
                     </button>
@@ -1654,20 +1688,41 @@ function KanbanColumn({
 }) {
   const [showColorPalette, setShowColorPalette] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editTitleValue, setEditTitleValue] = useState(column.title);
+  const [editTitleValue, setEditTitleValue] = useState(column.title || "");
+  const inputRef = useRef<HTMLInputElement>(null);
   const colorTheme = COLUMN_COLORS[column.color || "default"] || COLUMN_COLORS.default;
 
   useEffect(() => {
-    setEditTitleValue(column.title);
+    setEditTitleValue(column.title || "");
   }, [column.title]);
 
+  useEffect(() => {
+    if (isEditingTitle) {
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 50);
+    }
+  }, [isEditingTitle]);
+
   const handleSaveTitle = () => {
-    if (editTitleValue.trim() && editTitleValue.trim() !== column.title) {
-      onRenameColumn(column.id, editTitleValue.trim());
-    } else {
-      setEditTitleValue(column.title);
+    const trimmed = editTitleValue.trim();
+    if (trimmed && trimmed !== column.title) {
+      onRenameColumn(column.id, trimmed);
+    } else if (!trimmed) {
+      setEditTitleValue(column.title || "Sin Título");
     }
     setIsEditingTitle(false);
+  };
+
+  const handleSelectEmoji = (emoji: string) => {
+    const updated = applyEmojiToTitle(editTitleValue, emoji);
+    setEditTitleValue(updated);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   const {
@@ -1691,6 +1746,7 @@ function KanbanColumn({
   };
 
   const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
+  const displayTitle = column.title?.trim() || "Sin Título";
 
   return (
     <div
@@ -1705,180 +1761,211 @@ function KanbanColumn({
       {/* Accent colored top bar */}
       <div className={`h-1.5 w-full rounded-t-2xl ${colorTheme.bar}`} />
 
-      {/* Column Header */}
-      <div className="sticky top-0 z-10 px-3.5 py-3 border-b border-[#4a4455]/20 flex items-center justify-between backdrop-blur-xl">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {/* Drag handle for column reordering */}
-          {!isReadOnly && (
-            <div
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/10 text-[#958da1] hover:text-white transition-colors shrink-0"
-              title="Arrastrar para mover columna"
-            >
-              <span className="material-symbols-outlined text-sm leading-none">drag_indicator</span>
+      {/* Column Header: Top Tier (Centered Title) + Bottom Tier (Actions Toolbar) */}
+      <div className="sticky top-0 z-10 px-3 pt-3 pb-2 border-b border-[#4a4455]/20 backdrop-blur-xl flex flex-col gap-2">
+        {/* Tier 1: Centered Column Title or Edit Mode */}
+        {isEditingTitle ? (
+          <div className="flex flex-col gap-2 w-full animate-in fade-in zoom-in-95 duration-150">
+            {/* Quick Emoji Picker */}
+            <div className="column-emoji-box flex flex-col gap-1 bg-[#140c28]/95 p-2 rounded-xl border border-violet-500/30 shadow-inner">
+              <span className="text-[10px] font-semibold text-[#cbbddf] text-center">
+                Elige un emoji para la columna:
+              </span>
+              <div className="flex flex-wrap items-center justify-center gap-1 max-h-24 overflow-y-auto p-0.5">
+                {COLUMN_PRESET_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelectEmoji(emoji)}
+                    className="column-emoji-btn w-7 h-7 text-sm flex items-center justify-center rounded-lg hover:bg-violet-600/40 hover:scale-125 transition-transform active:scale-95 cursor-pointer bg-white/5"
+                    title={`Seleccionar ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
 
-          <span className="text-base shrink-0">{column.pinned ? "📌" : iconEmoji}</span>
-
-          {isEditingTitle ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSaveTitle();
-              }}
-              className="flex items-center gap-1 flex-1 min-w-0"
-            >
+            {/* Clearly Visible Centered Text Input */}
+            <div className="w-full">
               <input
+                ref={inputRef}
                 type="text"
                 autoFocus
+                placeholder="Nombre de la columna..."
                 value={editTitleValue}
                 onChange={(e) => setEditTitleValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setEditTitleValue(column.title);
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveTitle();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setEditTitleValue(column.title || "");
                     setIsEditingTitle(false);
                   }
                 }}
-                onBlur={handleSaveTitle}
-                className="glass-input px-2 py-0.5 text-xs font-bold text-white rounded-md w-full focus:outline-none focus:ring-1 focus:ring-[#7c3aed]"
+                className="column-edit-input w-full px-3 py-1.5 text-xs sm:text-sm font-bold text-center rounded-xl border-2 border-[#7c3aed] bg-[#1e1435] text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 shadow-inner"
               />
-              <button
-                type="submit"
-                className="text-emerald-400 hover:text-emerald-300 p-0.5 font-bold text-xs shrink-0 cursor-pointer"
-                title="Guardar nombre"
-              >
-                ✓
-              </button>
+            </div>
+
+            {/* Save & Cancel Buttons */}
+            <div className="flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  setEditTitleValue(column.title);
+                  setEditTitleValue(column.title || "");
                   setIsEditingTitle(false);
                 }}
-                className="text-[#958da1] hover:text-white p-0.5 font-bold text-xs shrink-0 cursor-pointer"
-                title="Cancelar"
+                className="px-3 py-1 text-xs font-semibold text-[#958da1] hover:text-white transition-colors cursor-pointer"
               >
-                ✕
+                Cancelar
               </button>
-            </form>
-          ) : (
-            <div
-              onClick={() => {
-                if (!isReadOnly) setIsEditingTitle(true);
-              }}
-              className="flex items-center gap-1.5 min-w-0 cursor-pointer group/coltitle flex-1"
-              title={isReadOnly ? column.title : "Clic para renombrar columna"}
-            >
-              <h3 className={`text-sm font-bold truncate tracking-tight ${colorTheme.text}`}>
-                {column.title}
-              </h3>
-              {!isReadOnly && (
-                <span className="material-symbols-outlined text-[13px] text-[#958da1] opacity-0 group-hover/coltitle:opacity-100 transition-opacity shrink-0">
-                  edit
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={handleSaveTitle}
+                className="primary-btn px-4 py-1 text-xs font-bold text-white rounded-lg shadow cursor-pointer flex items-center gap-1"
+              >
+                <span>✓ Guardar</span>
+              </button>
             </div>
-          )}
+          </div>
+        ) : (
+          <div
+            onClick={() => {
+              if (!isReadOnly) setIsEditingTitle(true);
+            }}
+            className="group/header w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded-xl cursor-pointer hover:bg-white/5 transition-all text-center"
+            title={isReadOnly ? column.title : "Clic para editar nombre y emoji"}
+          >
+            <h3
+              className={`column-header-title text-sm sm:text-base font-extrabold text-center tracking-tight truncate max-w-[270px] ${
+                colorTheme.text || "text-white"
+              }`}
+            >
+              {displayTitle}
+            </h3>
+            {!isReadOnly && (
+              <span className="material-symbols-outlined text-xs text-[#958da1] opacity-0 group-hover/header:opacity-100 transition-opacity shrink-0">
+                edit
+              </span>
+            )}
+          </div>
+        )}
 
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739] text-[#ccc3d8] shrink-0">
-            {cards.length}
-          </span>
-        </div>
+        {/* Tier 2: Bottom Toolbar with Pin, Move, Edit, Color, Cards Count, Delete */}
+        <div className="column-toolbar-box flex items-center justify-between px-2 py-1 rounded-xl bg-black/20 border border-white/5 backdrop-blur-md">
+          {/* Left Actions: Drag & Move Left/Right */}
+          <div className="flex items-center gap-0.5">
+            {!isReadOnly && (
+              <>
+                <div
+                  {...attributes}
+                  {...listeners}
+                  className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-white/10 text-[#958da1] hover:text-white transition-colors"
+                  title="Arrastrar para mover columna"
+                >
+                  <span className="material-symbols-outlined text-sm leading-none">drag_indicator</span>
+                </div>
 
-        {/* Column Actions: Pin, Color, Reorder, Delete */}
-        <div className="flex items-center gap-0.5 relative shrink-0">
-          {!isReadOnly && (
-            <>
-              {/* Quick Move Left */}
-              <button
-                type="button"
-                disabled={isFirst}
-                onClick={() => onMoveColumn(column.id, "left")}
-                className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5"
-                title="Mover a la izquierda"
-              >
-                <span className="text-[10px] font-bold">◀</span>
-              </button>
-
-              {/* Quick Move Right */}
-              <button
-                type="button"
-                disabled={isLast}
-                onClick={() => onMoveColumn(column.id, "right")}
-                className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5"
-                title="Mover a la derecha"
-              >
-                <span className="text-[10px] font-bold">▶</span>
-              </button>
-
-              {/* Rename Column button */}
-              <button
-                type="button"
-                onClick={() => setIsEditingTitle(true)}
-                className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/5 transition-colors"
-                title="Renombrar columna"
-              >
-                <span className="material-symbols-outlined text-xs leading-none">edit</span>
-              </button>
-
-              {/* Pin Column Toggle */}
-              <button
-                type="button"
-                onClick={() => onTogglePin(column.id)}
-                className={`p-1 rounded transition-colors ${
-                  column.pinned
-                    ? "text-[#d2bbff] bg-[#7c3aed]/30 ring-1 ring-[#7c3aed]/50"
-                    : "text-[#958da1] hover:text-white hover:bg-white/5"
-                }`}
-                title={column.pinned ? "Desfijar columna" : "Fijar columna al inicio"}
-              >
-                <span className="text-xs leading-none">📌</span>
-              </button>
-
-              {/* Color Palette Picker */}
-              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setShowColorPalette((prev) => !prev)}
-                  className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/5 transition-colors"
-                  title="Cambiar color de columna"
+                  disabled={isFirst}
+                  onClick={() => onMoveColumn(column.id, "left")}
+                  className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5 cursor-pointer"
+                  title="Mover columna a la izquierda"
                 >
-                  <span className="material-symbols-outlined text-xs leading-none">palette</span>
+                  <span className="text-[11px] font-bold">◀</span>
                 </button>
 
-                {showColorPalette && (
-                  <div className="absolute right-0 top-full mt-1.5 p-2 bg-[#1e192a] border border-[#7c3aed]/40 rounded-xl shadow-2xl z-30 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-100">
-                    {Object.entries(COLUMN_COLORS).map(([key, c]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          onSetColor(column.id, key);
-                          setShowColorPalette(false);
-                        }}
-                        className={`w-5 h-5 rounded-full ${c.dot} transition-transform hover:scale-125 border ${
-                          (column.color || "default") === key ? "ring-2 ring-white scale-110" : "border-white/20"
-                        }`}
-                        title={c.name}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+                <button
+                  type="button"
+                  disabled={isLast}
+                  onClick={() => onMoveColumn(column.id, "right")}
+                  className="p-1 text-[#958da1] hover:text-white disabled:opacity-20 disabled:hover:text-[#958da1] transition-colors rounded hover:bg-white/5 cursor-pointer"
+                  title="Mover columna a la derecha"
+                >
+                  <span className="text-[11px] font-bold">▶</span>
+                </button>
+              </>
+            )}
+          </div>
 
-              {/* Delete Column */}
-              <button
-                type="button"
-                onClick={() => onDeleteColumn(column.id)}
-                className="text-[#958da1] hover:text-red-400 p-1 rounded transition-colors"
-                title="Eliminar columna"
-              >
-                <IconTrash className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
+          {/* Center: Cards Count Badge */}
+          <div className="flex items-center justify-center">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739]/80 text-[#ccc3d8] border border-white/10">
+              {cards.length} {cards.length === 1 ? "tarjeta" : "tarjetas"}
+            </span>
+          </div>
+
+          {/* Right Actions: Pin, Edit, Color, Delete */}
+          <div className="flex items-center gap-0.5 relative">
+            {!isReadOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onTogglePin(column.id)}
+                  className={`p-1 rounded transition-colors cursor-pointer ${
+                    column.pinned
+                      ? "text-[#d2bbff] bg-[#7c3aed]/40 ring-1 ring-[#7c3aed]/60"
+                      : "text-[#958da1] hover:text-white hover:bg-white/10"
+                  }`}
+                  title={column.pinned ? "Desfijar columna" : "Fijar columna"}
+                >
+                  <span className="text-xs leading-none">📌</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTitle(true)}
+                  className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Editar nombre y emoji"
+                >
+                  <span className="material-symbols-outlined text-xs leading-none">edit</span>
+                </button>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowColorPalette((prev) => !prev)}
+                    className="p-1 text-[#958da1] hover:text-[#d2bbff] rounded hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Cambiar color de columna"
+                  >
+                    <span className="material-symbols-outlined text-xs leading-none">palette</span>
+                  </button>
+
+                  {showColorPalette && (
+                    <div className="absolute right-0 top-full mt-1.5 p-2 bg-[#1e192a] border border-[#7c3aed]/40 rounded-xl shadow-2xl z-30 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-100">
+                      {Object.entries(COLUMN_COLORS).map(([key, c]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            onSetColor(column.id, key);
+                            setShowColorPalette(false);
+                          }}
+                          className={`w-5 h-5 rounded-full ${c.dot} transition-transform hover:scale-125 border ${
+                            (column.color || "default") === key ? "ring-2 ring-white scale-110" : "border-white/20"
+                          }`}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onDeleteColumn(column.id)}
+                  className="text-[#958da1] hover:text-red-400 p-1 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
+                  title="Eliminar columna"
+                >
+                  <IconTrash className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1941,13 +2028,10 @@ function ColumnOverlay({ column }: { column: ColumnItem }) {
       className={`w-[316px] rounded-2xl border-2 border-[#7c3aed] shadow-2xl p-4 ${colorTheme.bg} backdrop-blur-xl rotate-1 scale-105 opacity-90`}
     >
       <div className={`h-1.5 w-full rounded-t-xl mb-3 ${colorTheme.bar}`} />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{column.pinned ? "📌" : "📋"}</span>
-          <h3 className={`text-sm font-bold ${colorTheme.text}`}>{column.title}</h3>
-        </div>
-        <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#2d2739] text-[#ccc3d8]">
-          {column.cards?.length || 0}
+      <div className="flex flex-col items-center justify-center text-center gap-1.5">
+        <h3 className={`text-sm sm:text-base font-extrabold ${colorTheme.text}`}>{column.title || "Sin Título"}</h3>
+        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#2d2739] text-[#ccc3d8]">
+          {column.cards?.length || 0} {(column.cards?.length || 0) === 1 ? "tarjeta" : "tarjetas"}
         </span>
       </div>
     </div>
