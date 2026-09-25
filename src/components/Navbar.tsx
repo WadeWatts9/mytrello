@@ -199,7 +199,10 @@ export default function Navbar({
             </Link>
 
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={async () => {
+                await signOut({ redirect: false });
+                window.location.href = "/login";
+              }}
               title="Cerrar sesión"
               className="p-2 rounded-xl text-[#958da1] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
             >

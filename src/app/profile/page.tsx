@@ -460,7 +460,10 @@ export default function ProfilePage() {
         <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs text-[#958da1]">
           <span>Sesión activa iniciada mediante NextAuth</span>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={async () => {
+              await signOut({ redirect: false });
+              window.location.href = "/login";
+            }}
             className="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-semibold cursor-pointer"
           >
             <IconLogOut className="w-3.5 h-3.5" />

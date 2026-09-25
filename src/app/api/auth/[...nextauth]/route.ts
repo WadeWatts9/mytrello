@@ -63,6 +63,15 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return url;
+      try {
+        const u = new URL(url);
+        return u.pathname + u.search + u.hash;
+      } catch {
+        return "/login";
+      }
+    },
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
