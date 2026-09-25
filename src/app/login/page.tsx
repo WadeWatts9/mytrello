@@ -22,19 +22,23 @@ function LoginForm() {
     setError("");
     setLoading(true);
 
-    const result = await signIn("credentials", {
-      redirect: false,
-      email: identifier,
-      password: password,
-    });
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: identifier.trim(),
+        password: password,
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (result?.error) {
-      setError("Credenciales inválidas. Verifica tu correo y contraseña.");
-    } else {
-      router.push("/");
-      router.refresh();
+      if (result?.error) {
+        setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+      } else {
+        window.location.href = "/";
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError("Error al iniciar sesión. Inténtalo de nuevo.");
     }
   };
 

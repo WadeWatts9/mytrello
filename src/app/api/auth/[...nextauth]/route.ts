@@ -16,8 +16,15 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+        const identifier = credentials.email.trim();
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: identifier },
+              { email: identifier.toLowerCase() },
+              { name: identifier },
+            ],
+          },
         });
 
         if (!user || !user.password) {
@@ -64,13 +71,11 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return url;
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
-        const u = new URL(url);
-        return u.pathname + u.search + u.hash;
-      } catch {
-        return "/login";
-      }
+        if (new URL(url).origin === baseUrl) return url;
+      } catch {}
+      return baseUrl;
     },
     async session({ session, token }) {
       if (session.user) {
@@ -84,6 +89,22 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "supersecret-jwt-key",
 };
 
-const handler = NextAuth(authOptions);
+const authHandler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST };
+export async function GET(req: Request, ctx: any) {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  if (host) {
+    process.env.NEXTAUTH_URL = `${proto}://${host}`;
+  }
+  return authHandler(req, ctx);
+}
+
+export async function POST(req: Request, ctx: any) {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  if (host) {
+    process.env.NEXTAUTH_URL = `${proto}://${host}`;
+  }
+  return authHandler(req, ctx);
+}
