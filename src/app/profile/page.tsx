@@ -5,17 +5,18 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   IconArrowLeft,
   IconLock,
   IconCheck,
-  IconCrown,
+  IconPin,
   IconLogOut,
   IconUpload,
 } from "@/components/Icons";
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -75,6 +76,9 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || "Error al actualizar perfil");
 
       setProfile((prev: any) => ({ ...prev, ...data }));
+      if (update) {
+        await update({ name: data.name, image: data.avatar, avatar: data.avatar });
+      }
       setProfileMessage({ type: "success", text: "¡Perfil actualizado con éxito!" });
     } catch (err: any) {
       setProfileMessage({ type: "error", text: err.message });
@@ -103,7 +107,7 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || "Error al subir avatar");
 
       setAvatar(data.url);
-      setProfileMessage({ type: "success", text: "Imagen cargada. Guarda los cambios para aplicarla." });
+      setProfileMessage({ type: "success", text: "Imagen cargada. Pulsa en 'Guardar Cambios' para aplicarla a tu cuenta." });
     } catch (err: any) {
       setProfileMessage({ type: "error", text: err.message });
     } finally {
@@ -162,7 +166,7 @@ export default function ProfilePage() {
   const isAdmin = profile?.role === "ADMIN";
 
   return (
-    <div className="min-h-screen bg-[#161121] text-[#e9def6] flex flex-col selection:bg-[#7c3aed] selection:text-white">
+    <div className="min-h-screen bg-[#161121] text-[#e9def6] flex flex-col selection:bg-[#7c3aed] selection:text-white justify-between">
       <Navbar />
 
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
@@ -181,7 +185,7 @@ export default function ProfilePage() {
                 Mi Perfil
               </h1>
               <p className="text-xs sm:text-sm text-[#958da1]">
-                Administra tu identidad, credenciales y preferencias de cuenta
+                Administra tu identidad, foto de perfil, credenciales y preferencias de cuenta
               </p>
             </div>
           </div>
@@ -189,9 +193,9 @@ export default function ProfilePage() {
           {isAdmin && (
             <Link
               href="/admin"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#7c3aed]/20 border border-[#7c3aed]/40 text-[#d2bbff] hover:bg-[#7c3aed]/30 text-xs font-bold transition-all shadow-sm"
             >
-              <IconCrown className="w-4 h-4 text-amber-400" />
+              <IconPin className="w-4 h-4 text-[#d2bbff]" />
               <span>Panel de Administración</span>
             </Link>
           )}
@@ -217,8 +221,8 @@ export default function ProfilePage() {
             <span
               className={`absolute -bottom-2 -right-2 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase shadow-md ${
                 isAdmin
-                  ? "bg-amber-500 text-black font-black"
-                  : "bg-[#7c3aed] text-white"
+                  ? "bg-[#7c3aed] text-white font-bold"
+                  : "bg-[#4f319c] text-white"
               }`}
             >
               {profile?.role}
@@ -307,9 +311,20 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#ccc3d8] mb-1.5">
-                  Foto de Perfil / Avatar
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-[#ccc3d8]">
+                    Foto de Perfil / Avatar (Opcional)
+                  </label>
+                  {avatar && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatar("")}
+                      className="text-[11px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                    >
+                      Quitar foto
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input
@@ -332,7 +347,7 @@ export default function ProfilePage() {
                     </label>
                   </div>
                   <p className="text-[11px] text-[#958da1]">
-                    Introduce una URL o sube una imagen directamente a tu servidor SQLite.
+                    Opcional: Sube una foto de perfil o introduce una URL externa.
                   </p>
                 </div>
               </div>
@@ -436,6 +451,8 @@ export default function ProfilePage() {
           </button>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

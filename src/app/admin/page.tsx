@@ -4,8 +4,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
-  IconCrown,
+  IconPin,
   IconUser,
   IconUsers,
   IconPlus,
@@ -221,8 +222,8 @@ export default function AdminPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
-              <span className="p-2 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                <IconCrown className="w-7 h-7" />
+              <span className="p-2 rounded-2xl bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/40">
+                <IconPin className="w-7 h-7" />
               </span>
               Administración de MyTrello
             </h1>
@@ -361,8 +362,8 @@ export default function AdminPage() {
                       </td>
                       <td className="py-3 px-4">
                         {user.role === "ADMIN" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                            <IconCrown className="w-3.5 h-3.5" />
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/40">
+                            <IconPin className="w-3.5 h-3.5" />
                             ADMIN
                           </span>
                         ) : (
@@ -631,6 +632,9 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ACDev Global Footer */}
+      <Footer className="mt-auto shrink-0" />
     </div>
   );
 }

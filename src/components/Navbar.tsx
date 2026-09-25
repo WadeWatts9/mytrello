@@ -6,7 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import ThemeToggle from "./ThemeToggle";
 import {
-  IconCrown,
+  IconPin,
   IconLogOut,
   IconSearch,
   IconShare,
@@ -151,7 +151,7 @@ export default function Navbar({
         {/* Role Badge Indicator */}
         {boardRole && (
           <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#7c3aed]/15 border border-[#7c3aed]/30 text-xs font-bold text-[#d2bbff]">
-            <span>{boardRole === "OWNER" || isAdmin ? "👑" : boardRole === "EDITOR" ? "✏️" : "👁️"}</span>
+            <span>{boardRole === "OWNER" || isAdmin ? "📌" : boardRole === "EDITOR" ? "✏️" : "👁️"}</span>
             <span>{boardRole}</span>
           </div>
         )}
@@ -160,9 +160,9 @@ export default function Navbar({
         {isAdmin && (
           <Link
             href="/admin"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/35 text-amber-300 text-xs font-bold hover:bg-amber-500/25 transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#7c3aed]/20 border border-[#7c3aed]/40 text-[#d2bbff] hover:bg-[#7c3aed]/30 text-xs font-bold transition-all shadow-sm"
           >
-            <IconCrown className="w-3.5 h-3.5 text-amber-400" />
+            <IconPin className="w-3.5 h-3.5 text-[#d2bbff]" />
             <span>Panel Admin</span>
           </Link>
         )}

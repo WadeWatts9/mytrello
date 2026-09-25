@@ -38,6 +38,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          image: user.avatar || null,
         };
       },
     }),
@@ -49,10 +50,16 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
+        token.picture = (user as any).image;
+      }
+      if (trigger === "update" && session) {
+        if (session.name !== undefined) token.name = session.name;
+        if (session.image !== undefined) token.picture = session.image;
+        if (session.avatar !== undefined) token.picture = session.avatar;
       }
       return token;
     },
@@ -60,6 +67,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
+        (session.user as any).image = token.picture;
       }
       return session;
     },

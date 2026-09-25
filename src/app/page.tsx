@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   IconPlus,
   IconSearch,
@@ -672,6 +673,9 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* ACDev Global Footer */}
+      <Footer className="mt-auto shrink-0" />
     </div>
   );
 }

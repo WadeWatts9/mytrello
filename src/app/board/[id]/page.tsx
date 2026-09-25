@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   IconArrowLeft,
   IconPlus,
@@ -218,17 +219,79 @@ export default function BoardPage() {
 
   const isReadOnly = board?.accessRole === "VIEWER";
 
-  // Unique tags for filter bar
-  const allTags = useMemo(() => {
+  // Tag frequency across all active cards in the board
+  const tagFrequency = useMemo(() => {
     if (!board) return [];
-    const tagSet = new Set<string>();
-    board.columns.forEach((col) => {
-      col.cards.forEach((c) => {
-        c.tags?.forEach((t) => tagSet.add(t.name));
+    const counts: Record<string, number> = {};
+    board.columns?.forEach((col) => {
+      col.cards?.forEach((c) => {
+        c.tags?.forEach((t) => {
+          counts[t.name] = (counts[t.name] || 0) + 1;
+        });
       });
     });
-    return Array.from(tagSet);
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   }, [board]);
+
+  const allTags = useMemo(() => tagFrequency.map((t) => t.name), [tagFrequency]);
+
+  // Quick Filters state
+  const [quickFilters, setQuickFilters] = useState<string[]>([]);
+  const [newQuickFilterInput, setNewQuickFilterInput] = useState("");
+  const [isAddingQuickFilter, setIsAddingQuickFilter] = useState(false);
+
+  // Initialize and sync quick filters
+  useEffect(() => {
+    if (!boardId) return;
+    try {
+      const saved = localStorage.getItem(`mytrello_filters_${boardId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setQuickFilters(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Default to top 6 most used tags
+    if (tagFrequency.length > 0) {
+      setQuickFilters(tagFrequency.slice(0, 6).map((t) => t.name));
+    }
+  }, [boardId, tagFrequency]);
+
+  const saveQuickFilters = (filters: string[]) => {
+    setQuickFilters(filters);
+    try {
+      localStorage.setItem(`mytrello_filters_${boardId}`, JSON.stringify(filters));
+    } catch (e) {}
+  };
+
+  const handleRemoveQuickFilter = (tagToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = quickFilters.filter((t) => t !== tagToRemove);
+    saveQuickFilters(next);
+    if (selectedTag === tagToRemove) {
+      setSelectedTag(null);
+    }
+  };
+
+  const handleAddQuickFilter = (tagToAdd: string) => {
+    const clean = tagToAdd.replace(/^#/, "").trim();
+    if (!clean) return;
+    if (!quickFilters.includes(clean)) {
+      const next = [...quickFilters, clean];
+      saveQuickFilters(next);
+    }
+    setNewQuickFilterInput("");
+    setIsAddingQuickFilter(false);
+  };
+
+  const suggestedTags = useMemo(() => {
+    return tagFrequency.filter((t) => !quickFilters.includes(t.name)).slice(0, 6);
+  }, [tagFrequency, quickFilters]);
 
   // Handle adding card
   async function handleAddCard(columnId: string, customTitle?: string) {
@@ -542,33 +605,6 @@ export default function BoardPage() {
 
           <div className="h-6 w-px bg-[#4a4455]/30" />
 
-          {/* Hashtag Filters */}
-          {allTags.length > 0 && (
-            <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto max-w-xs md:max-w-md">
-              {selectedTag && (
-                <button
-                  onClick={() => setSelectedTag(null)}
-                  className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-white/10 text-white hover:bg-white/20"
-                >
-                  ✕ Todos
-                </button>
-              )}
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                  className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
-                    selectedTag === tag
-                      ? "bg-[#7c3aed] text-white shadow-sm"
-                      : "bg-[#7c3aed]/20 text-[#cebdff] border border-[#7c3aed]/30 hover:bg-[#7c3aed]/30"
-                  }`}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Archive Button */}
           <button
             onClick={() => {
@@ -619,6 +655,143 @@ export default function BoardPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Quick Filters Sub-Bar (Filtros Rápidos interactivos) */}
+      <div className="px-6 sm:px-8 py-2.5 border-b border-[#4a4455]/20 bg-[#161121]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+        <div className="flex items-center flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-[#958da1] font-semibold mr-1">
+            <span className="material-symbols-outlined text-sm text-[#d2bbff]">filter_list</span>
+            <span>Filtros Rápidos:</span>
+          </div>
+
+          {/* Reset / View All */}
+          {selectedTag && (
+            <button
+              onClick={() => setSelectedTag(null)}
+              className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-white/10 text-white hover:bg-white/20 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Mostrar todas las tarjetas"
+            >
+              <span>✕ Ver Todos</span>
+            </button>
+          )}
+
+          {/* Quick Filter chips */}
+          {quickFilters.map((tag) => {
+            const isSelected = selectedTag === tag;
+            const count = tagFrequency.find((t) => t.name === tag)?.count || 0;
+            return (
+              <div
+                key={tag}
+                onClick={() => setSelectedTag(isSelected ? null : tag)}
+                className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer select-none ${
+                  isSelected
+                    ? "bg-[#7c3aed] text-white shadow-sm ring-1 ring-[#cebdff]/40"
+                    : "bg-[#7c3aed]/15 text-[#d2bbff] border border-[#7c3aed]/30 hover:bg-[#7c3aed]/25"
+                }`}
+                title={`Filtrar por #${tag} (${count} tarjetas)`}
+              >
+                <span>#{tag}</span>
+                {count > 0 && (
+                  <span
+                    className={`text-[10px] px-1 py-0.2 rounded-full font-bold ${
+                      isSelected ? "bg-white/20 text-white" : "bg-[#7c3aed]/30 text-[#e9def6]"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveQuickFilter(tag, e)}
+                  className="opacity-60 hover:opacity-100 hover:text-red-300 ml-0.5 p-0.5 rounded transition-opacity"
+                  title="Eliminar de filtros rápidos"
+                >
+                  <IconX className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Add Filter inline */}
+          {isAddingQuickFilter ? (
+            <div className="flex items-center gap-1.5 bg-[#100b1c] border border-[#7c3aed]/50 rounded-lg px-2 py-0.5 animate-in fade-in zoom-in-95 duration-100">
+              <span className="text-[#958da1] text-xs">#</span>
+              <input
+                type="text"
+                autoFocus
+                placeholder="nuevo-hashtag"
+                value={newQuickFilterInput}
+                onChange={(e) => setNewQuickFilterInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddQuickFilter(newQuickFilterInput);
+                  } else if (e.key === "Escape") {
+                    setIsAddingQuickFilter(false);
+                    setNewQuickFilterInput("");
+                  }
+                }}
+                className="bg-transparent text-xs text-white focus:outline-none w-28"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddQuickFilter(newQuickFilterInput)}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold px-1"
+                title="Añadir"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingQuickFilter(false);
+                  setNewQuickFilterInput("");
+                }}
+                className="text-xs text-[#958da1] hover:text-white px-1"
+                title="Cancelar"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAddingQuickFilter(true)}
+              className="px-2 py-1 rounded-lg text-xs font-semibold text-[#ccc3d8] hover:text-white bg-white/5 hover:bg-white/10 border border-dashed border-[#4a4455]/40 hover:border-[#7c3aed] flex items-center gap-1 transition-all cursor-pointer"
+              title="Añadir un nuevo filtro rápido"
+            >
+              <IconPlus className="w-3 h-3 text-[#d2bbff]" />
+              <span>Añadir filtro</span>
+            </button>
+          )}
+
+          {quickFilters.length === 0 && tagFrequency.length > 0 && (
+            <button
+              onClick={() => setQuickFilters(tagFrequency.slice(0, 6).map((t) => t.name))}
+              className="text-[11px] text-[#cebdff] hover:underline cursor-pointer ml-1"
+            >
+              Cargar más usados
+            </button>
+          )}
+        </div>
+
+        {/* Suggested Top Tags */}
+        {suggestedTags.length > 0 && (
+          <div className="hidden lg:flex items-center gap-1.5 text-xs">
+            <span className="text-[11px] text-[#958da1]">Más usadas:</span>
+            {suggestedTags.map((st) => (
+              <button
+                key={st.name}
+                onClick={() => handleAddQuickFilter(st.name)}
+                className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-white/5 text-[#ccc3d8] hover:text-white hover:bg-[#7c3aed]/20 border border-white/10 flex items-center gap-1 transition-all cursor-pointer"
+                title={`Añadir #${st.name} a los filtros rápidos (${st.count} tarjetas)`}
+              >
+                <span>+{st.name}</span>
+                <span className="text-[9px] text-[#958da1]">({st.count})</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Kanban Canvas */}
@@ -917,8 +1090,9 @@ export default function BoardPage() {
                       <div className="text-[10px] text-[#958da1]">{board.owner?.email}</div>
                     </div>
                   </div>
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/40">
-                    👑 Propietario
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#7c3aed]/20 text-[#d2bbff] border border-[#7c3aed]/40 flex items-center gap-1">
+                    <span>📌</span>
+                    <span>Propietario</span>
                   </span>
                 </div>
 
@@ -957,6 +1131,9 @@ export default function BoardPage() {
           </div>
         </div>
       )}
+
+      {/* ACDev Global Footer */}
+      <Footer className="mt-auto shrink-0" />
     </div>
   );
 }
